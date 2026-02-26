@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Kaede
+Comment=Manage GPU selection for applications
+Exec=kaede
+Icon=com.kaede.gpu-manager
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;
+StartupWMClass=kaede
+Keywords=gpu;nvidia;amd;intel;prime;
