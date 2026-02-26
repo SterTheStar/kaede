@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux-1793D1?style=for-the-badge&logo=linux&logoColor=white" />
-  <img alt="Language" src="https://img.shields.io/badge/language-Rust-000000?style=for-the-badge&logo=rust" />
-  <img alt="UI" src="https://img.shields.io/badge/UI-GTK4%20%2F%20libadwaita-4A86CF?style=for-the-badge&logo=gnome" />
-  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=for-the-badge" />
-  <img alt="Rust Version" src="https://img.shields.io/badge/rust-1.75%2B-orange?style=for-the-badge&logo=rust" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux-1793D1?style=flat-square&logo=linux&logoColor=white" />
+  <img alt="Language" src="https://img.shields.io/badge/language-Rust-000000?style=flat-square&logo=rust" />
+  <img alt="UI" src="https://img.shields.io/badge/UI-GTK4%20%2F%20libadwaita-4A86CF?style=flat-square&logo=gnome" />
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square" />
+  <img alt="Rust Version" src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square&logo=rust" />
 </p>
 
 <p align="center">
