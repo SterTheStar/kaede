@@ -1,0 +1,17 @@
+[package]
+name = "kaede"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+adw = { package = "libadwaita", version = "0.7" }
+anyhow = "1.0"
+freedesktop-desktop-entry = "0.7"
+gio = "0.20"
+glib = "0.20"
+gtk = { package = "gtk4", version = "0.9" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
