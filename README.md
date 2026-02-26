@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img width="1120" height="670" alt="Kaede screenshot" src="https://github.com/user-attachments/assets/659a1336-b443-4606-94b0-a5dd35b9192a" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
+  <img width="1120" height="670" alt="Kaede screenshot" src="https://github.com/user-attachments/assets/24adb301-c812-4261-817b-839941fb554b" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
 </p>
 
 ---
