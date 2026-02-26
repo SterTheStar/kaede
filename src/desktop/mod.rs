@@ -2,6 +2,7 @@ use crate::models::DesktopApp;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn scan_desktop_entries() -> Vec<DesktopApp> {
     let mut map: BTreeMap<String, DesktopApp> = BTreeMap::new();
@@ -27,8 +28,40 @@ pub fn scan_desktop_entries() -> Vec<DesktopApp> {
     }
 
     let mut apps: Vec<DesktopApp> = map.into_values().collect();
-    apps.sort_by_key(|a| a.name.to_lowercase());
+    shuffle_in_place(&mut apps);
     apps
+}
+
+fn shuffle_in_place<T>(items: &mut [T]) {
+    if items.len() < 2 {
+        return;
+    }
+
+    let mut state = seed();
+    for i in (1..items.len()).rev() {
+        let j = (next_u64(&mut state) % (i as u64 + 1)) as usize;
+        items.swap(i, j);
+    }
+}
+
+fn seed() -> u64 {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+    let pid = std::process::id() as u64;
+    // Mix a few bits so subsequent launches don't end up correlated.
+    nanos ^ pid.rotate_left(17) ^ (nanos >> 23)
+}
+
+fn next_u64(state: &mut u64) -> u64 {
+    // xorshift64*
+    let mut x = *state;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    *state = x;
+    x.wrapping_mul(0x2545F4914F6CDD1D)
 }
 
 fn application_dirs() -> Vec<PathBuf> {

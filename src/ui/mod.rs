@@ -95,11 +95,11 @@ pub fn build_ui(app: &adw::Application) {
     search_slot.append(&search_overlay);
     header.pack_start(&search_slot);
 
-    let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
     root.append(&header);
 
     let content = gtk::Paned::new(gtk::Orientation::Horizontal);
-    content.set_margin_top(8);
+    content.set_margin_top(0);
     content.set_margin_bottom(12);
     content.set_margin_start(12);
     content.set_margin_end(12);
@@ -359,7 +359,8 @@ pub fn build_ui(app: &adw::Application) {
         apps_box.connect_row_selected(move |_, row| {
             let Some(row) = row else {
                 *selected_app_id.borrow_mut() = None;
-                set_app_details_empty(&details_widgets);
+                let gpus = state.borrow().gpus.clone();
+                set_app_details_empty(&details_widgets, &gpus);
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
                 return;
             };
@@ -367,7 +368,8 @@ pub fn build_ui(app: &adw::Application) {
             let idx = row.index();
             if idx < 0 {
                 *selected_app_id.borrow_mut() = None;
-                set_app_details_empty(&details_widgets);
+                let gpus = state.borrow().gpus.clone();
+                set_app_details_empty(&details_widgets, &gpus);
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
                 return;
             }
@@ -381,7 +383,8 @@ pub fn build_ui(app: &adw::Application) {
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, true);
             } else {
                 *selected_app_id.borrow_mut() = None;
-                set_app_details_empty(&details_widgets);
+                let gpus = state.borrow().gpus.clone();
+                set_app_details_empty(&details_widgets, &gpus);
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
             }
         });
@@ -402,6 +405,7 @@ pub fn build_ui(app: &adw::Application) {
         let content = content.clone();
         let apps_scrolled = apps_scrolled.clone();
         let selected_app_id = selected_app_id.clone();
+        let state = state.clone();
         let click = gtk::GestureClick::new();
         click.connect_pressed(move |gesture, _, x, y| {
             let Some(widget) = gesture.widget() else {
@@ -430,7 +434,8 @@ pub fn build_ui(app: &adw::Application) {
             if !in_apps && !in_details {
                 apps_box.unselect_all();
                 *selected_app_id.borrow_mut() = None;
-                set_app_details_empty(&details_widgets);
+                let gpus = state.borrow().gpus.clone();
+                set_app_details_empty(&details_widgets, &gpus);
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
             }
         });
@@ -485,11 +490,11 @@ pub fn build_ui(app: &adw::Application) {
                     set_app_details(&details_widgets, &app, &choice, &data.gpus);
                     set_details_panel_visible(&content, &details_revealer, &apps_scrolled, true);
                 } else {
-                    set_app_details_empty(&details_widgets);
+                    set_app_details_empty(&details_widgets, &data.gpus);
                     set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
                 }
             } else {
-                set_app_details_empty(&details_widgets);
+                set_app_details_empty(&details_widgets, &data.gpus);
                 set_details_panel_visible(&content, &details_revealer, &apps_scrolled, false);
             }
         });
@@ -606,7 +611,10 @@ fn rebuild_app_list(
         center.append(&name);
 
         let current_choice = config.borrow().get_choice(&app.desktop_id);
-        let current = gtk::Label::new(Some(&format!("Current: {}", current_choice.label())));
+        let current = gtk::Label::new(Some(&format!(
+            "Current: {}",
+            gpu_choice_label(gpus, &current_choice)
+        )));
         current.set_xalign(0.0);
         current.add_css_class("caption");
         center.append(&current);
@@ -660,7 +668,7 @@ fn rebuild_app_list(
                     desktop_id = %app.desktop_id,
                     steam_app_id = ?app.steam_app_id,
                     flatpak_app_id = ?app.flatpak_app_id,
-                    gpu_choice = %choice.label(),
+                    gpu_choice = %gpu_choice_label(gpus_shared.as_ref(), &choice),
                     selected_gpu = ?selected_gpu.as_ref().map(|g| g.name.clone()),
                     "changing GPU assignment"
                 );
@@ -707,7 +715,10 @@ fn rebuild_app_list(
                 }
 
                 last_choice.replace(choice.clone());
-                current.set_text(&format!("Current: {}", choice.label()));
+                current.set_text(&format!(
+                    "Current: {}",
+                    gpu_choice_label(gpus_shared.as_ref(), &choice)
+                ));
                 let selected = selected_app_id.borrow().clone();
                 if selected.as_deref() == Some(app.desktop_id.as_str()) {
                     set_app_details(&details_widgets, &app, &choice, &gpus_shared);
@@ -750,10 +761,14 @@ fn build_gpu_choices(gpus: &[GpuInfo]) -> Vec<(String, GpuChoice)> {
 }
 
 fn gpu_choice_label(gpus: &[GpuInfo], choice: &GpuChoice) -> String {
-    build_gpu_choices(gpus)
-        .into_iter()
-        .find_map(|(label, c)| if &c == choice { Some(label) } else { None })
-        .unwrap_or_else(|| choice.label())
+    match choice {
+        GpuChoice::Default => format!("Default GPU ({})", default_gpu_hint(gpus)),
+        GpuChoice::Gpu(idx) => gpus
+            .iter()
+            .find(|g| g.dri_prime_index == Some(*idx))
+            .map(|gpu| format!("{} (#{idx})", pretty_gpu_name(gpu)))
+            .unwrap_or_else(|| format!("GPU {idx}")),
+    }
 }
 
 fn default_gpu_hint(gpus: &[GpuInfo]) -> String {
@@ -898,10 +913,12 @@ fn set_app_details(
     details.raw_buffer.set_text(&raw);
 }
 
-fn set_app_details_empty(details: &AppDetailsWidgets) {
+fn set_app_details_empty(details: &AppDetailsWidgets, gpus: &[GpuInfo]) {
     details.icon.set_icon_name(Some("application-x-executable"));
     details.name.set_text("Select an application");
-    details.assignment.set_text("Current GPU: Default GPU");
+    details
+        .assignment
+        .set_text(&format!("Current GPU: {}", gpu_choice_label(gpus, &GpuChoice::Default)));
     details.source.set_text("Source: Native desktop entry");
     details.desktop_id.set_text("Desktop ID: -");
     details.path.set_text("Path: -");
