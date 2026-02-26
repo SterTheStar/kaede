@@ -1,7 +1,12 @@
 [package]
 name = "kaede"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
+
+[package.metadata.bundle]
+name = "Kaede"
+identifier = "com.kaede.Kaede"
+icon = ["src/icons/icon.png"]
 
 [dependencies]
 adw = { package = "libadwaita", version = "0.7" }

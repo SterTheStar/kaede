@@ -1,92 +1,66 @@
-<p align="center">
-  <img width="128" height="128" alt="Kaede logo" src="https://github.com/user-attachments/assets/287d1e40-041e-4d86-ac22-dbccc70dbaa6" />
-</p>
+# Kaede
 
-<h1 align="center">Kaede</h1>
+Kaede is a Linux desktop app (Rust + GTK4/libadwaita) to assign applications and games to a specific GPU with a visual interface.
 
-<p align="center">
-  <strong>A modern GPU management utility for Linux desktop environments.</strong><br />
-  Explicitly control hardware acceleration by selecting specific GPUs for applications and games.
-</p>
+## Highlights
 
-<p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux-1793D1?style=flat-square&logo=linux&logoColor=white" />
-  <img alt="Language" src="https://img.shields.io/badge/language-Rust-000000?style=flat-square&logo=rust" />
-  <img alt="UI" src="https://img.shields.io/badge/UI-GTK4%20%2F%20libadwaita-4A86CF?style=flat-square&logo=gnome" />
-  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square" />
-  <img alt="Rust Version" src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square&logo=rust" />
-</p>
-
-<p align="center">
-  <img width="1120" height="670" alt="Kaede screenshot" src="https://github.com/user-attachments/assets/659a1336-b443-4606-94b0-a5dd35b9192a" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
-</p>
-
----
-
-## Core Features
-
-- **Hardware Discovery**: Automatically detects available GPUs via `/sys/class/drm`, `lspci`, and `/dev/dri/renderD*`.
-- **Renderer Analysis**: Evaluates active renderers using `glxinfo -B` with Vulkan fallback support.
-- **Application Scanning**: Indexes `.desktop` files across system and user-wide paths:
+- Detects GPUs using `/sys/class/drm`, `lspci`, and `/dev/dri/renderD*`
+- Detects renderer info using `glxinfo -B` (with Vulkan fallback)
+- Scans apps from `.desktop` files in:
   - `/usr/share/applications`
   - `/usr/local/share/applications`
   - `~/.local/share/applications`
   - `/var/lib/flatpak/exports/share/applications`
   - `~/.local/share/flatpak/exports/share/applications`
-- **User-Centric Management**: Searchable interface with per-app GPU preference selection.
-- **Non-Destructive Overrides**: Modifies local user configurations without altering system-level files.
+- Searchable app list with per-app GPU selector
+- Safe user-level overrides (does not overwrite system launchers)
 
-## Integration Targets
+## Supported Targets
 
-| Ecosystem | Implementation Strategy |
-| :--- | :--- |
-| **Native Binaries** | Generates localized `.desktop` overrides in `~/.local/share/applications`. |
-| **Flatpak Apps** | Executes `flatpak override --user` to inject environment variables. |
-| **Steam (Proton)** | Dynamically updates `LaunchOptions` in `localconfig.vdf` with automated backups. |
-| **Heroic Launcher** | Modifies JSON configuration files within `GamesConfig` for precise environment control. |
+- Native `.desktop` apps
+  - Generates user overrides in `~/.local/share/applications`
+- Flatpak apps
+  - Uses `flatpak override --user` env vars
+- Steam games
+  - Edits per-game `LaunchOptions` in `localconfig.vdf`
+  - Creates backup automatically (`localconfig.vdf.kaede.bak`)
+- Heroic games
+  - Edits per-game `GamesConfig/*.json` env options
+  - Creates backup automatically (`*.json.kaede.bak`)
 
-## GPU Driver Orchestration
+## GPU Variables Used
 
-Kaede manages the following environment variables to ensure optimal hardware utilization:
+Depending on selected GPU/driver stack, Kaede can apply:
 
-- `DRI_PRIME` for Mesa/Open Source drivers.
-- `PRESSURE_VESSEL_IMPORT_VARS` for Steam Runtime compatibility.
-- **NVIDIA Prime Offload**:
+- `DRI_PRIME`
+- `PRESSURE_VESSEL_IMPORT_VARS` (Steam/Proton)
+- NVIDIA offload vars:
   - `__NV_PRIME_RENDER_OFFLOAD=1`
   - `__GLX_VENDOR_LIBRARY_NAME=nvidia`
   - `__VK_LAYER_NV_optimus=NVIDIA_only`
-- **Mesa Vulkan Layer**:
+- Mesa Vulkan selection vars:
   - `MESA_VK_DEVICE_SELECT`
   - `MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE`
 
-## Installation
+## Config
 
-### Prerequisites
+Kaede stores per-app GPU preferences in:
 
-Ensure your system has the following components:
-- **GNOME / Libadwaita**: Runtime libraries for the GTK4 interface.
-- **Development Tools**: Cargo and Rust toolchain (1.75+ recommended).
-- **Optional Dependencies**: `pciutils` (lspci), `mesa-utils` (glxinfo), and `vulkan-tools` (vulkaninfo) for enhanced telemetry.
+- `~/.config/kaede/config.toml`
 
-### Build from Source
+## Build and Run
 
 ```bash
-git clone https://github.com/SterTheStar/kaede.git
-cd kaede
-cargo build --release
-./target/release/kaede
+cargo build
+cargo run
 ```
 
-## Configuration
+## Requirements
 
-Persistent settings are stored in TOML format:
-`~/.config/kaede/config.toml`
+- Linux with GTK4 and libadwaita runtime/development packages
+- Optional tools for richer detection: `lspci`, `glxinfo`, `vulkaninfo`
+- `flatpak` command available for Flatpak overrides
 
 ## License
 
-Distributed under the **GNU General Public License v3.0**. See `LICENSE` for more information.
-
----
-<p align="center">
-  Developed by <a href="https://github.com/SterTheStar">Esther</a>
-</p>
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
