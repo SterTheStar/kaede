@@ -41,8 +41,8 @@
 | :--- | :--- |
 | **Native Binaries** | Generates localized `.desktop` overrides in `~/.local/share/applications`. |
 | **Flatpak Apps** | Executes `flatpak override --user` to inject environment variables. |
-| **Steam (Proton)** | Dynamically updates `LaunchOptions` in `localconfig.vdf` with automated backups. |
-| **Heroic Launcher** | Modifies JSON configuration files within `GamesConfig` for precise environment control. |
+| **Steam (Proton)** | Dynamically updates `LaunchOptions` in `localconfig.vdf`. |
+| **Heroic Launcher** | Modifies JSON configuration files within `GamesConfig` for environment control. |
 
 ## GPU Driver Orchestration
 
