@@ -5,8 +5,8 @@
 <h1 align="center">Kaede</h1>
 
 <p align="center">
-  <strong>A modern GPU management utility for Linux desktop environments.</strong><br />
-  Explicitly control hardware acceleration by selecting specific GPUs for applications and games.
+  <strong>A simple GPU manager for Linux.</strong><br />
+  Choose which GPU an application or game should run on.
 </p>
 
 <p align="center">
