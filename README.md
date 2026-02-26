@@ -10,18 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/esther/KaedeGPU">
-    <img src="https://img.shields.io/badge/Platform-Linux-1793D1?style=for-the-badge&logo=linux&logoColor=white" alt="Platform" />
-  </a>
-  <a href="https://www.rust-lang.org/">
-    <img src="https://img.shields.io/badge/Language-Rust-黑色?style=for-the-badge&logo=rust&logoColor=white" alt="Language" />
-  </a>
-  <a href="https://gnome.pages.gitlab.gnome.org/libadwaita/">
-    <img src="https://img.shields.io/badge/UI-Libadwaita-4A86CF?style=for-the-badge&logo=gnome&logoColor=white" alt="UI" />
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License" />
-  </a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux-1793D1?style=for-the-badge&logo=linux&logoColor=white" />
+  <img alt="Language" src="https://img.shields.io/badge/language-Rust-000000?style=for-the-badge&logo=rust" />
+  <img alt="UI" src="https://img.shields.io/badge/UI-GTK4%20%2F%20libadwaita-4A86CF?style=for-the-badge&logo=gnome" />
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=for-the-badge" />
+  <img alt="Rust Version" src="https://img.shields.io/badge/rust-1.75%2B-orange?style=for-the-badge&logo=rust" />
 </p>
 
 <p align="center">
