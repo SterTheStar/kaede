@@ -16,7 +16,8 @@ const APP_DESCRIPTION: &str =
 const APP_AUTHOR: &str = "Esther";
 const APP_GITHUB: &str = "https://github.com/esther/KaedeGPU";
 const APP_LICENSE: &str = "GNU GPL-3.0";
-const APP_ICON_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/icons/icon.png");
+// Use the installed themed icon name so it works from the packaged build.
+const APP_ICON_PATH: &str = "com.kaede.gpu-manager";
 
 #[derive(Clone)]
 struct UiState {
@@ -546,27 +547,33 @@ fn show_about_dialog(window: &adw::ApplicationWindow) {
     description.add_css_class("caption");
     wrapper.append(&description);
 
-    let card = gtk::Frame::new(None);
-    card.add_css_class("card");
-    let info_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
-    info_box.set_margin_top(12);
-    info_box.set_margin_bottom(12);
-    info_box.set_margin_start(12);
-    info_box.set_margin_end(12);
+    let list = gtk::ListBox::new();
+    list.add_css_class("boxed-list");
+    list.set_selection_mode(gtk::SelectionMode::None);
 
-    let author = gtk::Label::new(Some(&format!("Author: {APP_AUTHOR}")));
-    author.set_xalign(0.5);
-    let license = gtk::Label::new(Some(&format!("License: {APP_LICENSE}")));
-    license.set_xalign(0.5);
+    let author_row = adw::ActionRow::builder()
+        .title("Author")
+        .subtitle(APP_AUTHOR)
+        .build();
+    list.append(&author_row);
+
+    let license_row = adw::ActionRow::builder()
+        .title("License")
+        .subtitle(APP_LICENSE)
+        .build();
+    list.append(&license_row);
+
+    let github_row = adw::ActionRow::builder()
+        .title("Project")
+        .subtitle("Source code and issue tracker")
+        .build();
     let github = gtk::LinkButton::with_label(APP_GITHUB, "GitHub Repository");
-    github.set_halign(gtk::Align::Center);
+    github.add_css_class("flat");
+    github_row.add_suffix(&github);
+    github_row.set_activatable_widget(Some(&github));
+    list.append(&github_row);
 
-    info_box.append(&author);
-    info_box.append(&license);
-    info_box.append(&github);
-    card.set_child(Some(&info_box));
-    wrapper.append(&card);
-
+    wrapper.append(&list);
     content.append(&wrapper);
     dialog.present();
 }
