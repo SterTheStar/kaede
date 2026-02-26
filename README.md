@@ -59,15 +59,6 @@ Kaede manages the following environment variables to ensure optimal hardware uti
   - `MESA_VK_DEVICE_SELECT`
   - `MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE`
 
-## Installation
-
-### Prerequisites
-
-Ensure your system has the following components:
-- **GNOME / Libadwaita**: Runtime libraries for the GTK4 interface.
-- **Development Tools**: Cargo and Rust toolchain (1.75+ recommended).
-- **Optional Dependencies**: `pciutils` (lspci), `mesa-utils` (glxinfo), and `vulkan-tools` (vulkaninfo) for enhanced telemetry.
-
 ### Build from Source
 
 ```bash
