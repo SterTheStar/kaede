@@ -13,7 +13,7 @@ use adw::prelude::*;
 fn main() {
     logger::init();
     let app = adw::Application::builder()
-        .application_id("com.kaede.Kaede")
+        .application_id("com.kaede.gpu-manager")
         .build();
 
     app.connect_activate(|app| {

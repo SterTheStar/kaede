@@ -1,116 +1,96 @@
 #!/bin/bash
 
-# Exit immediately if any command fails
+# Exit on error
 set -e
 
-echo "--- Starting Kaede build process ---"
+echo "--- Starting Kaede Build Process ---"
 
-# Ensure the output directory exists and is clean
+# 1. Create build directory for all artifacts
 mkdir -p build
 rm -rf build/*
 
-# --------------------------------------------------
-# 1. Build release binary
-# --------------------------------------------------
+# 2. Build Release Binary
 echo "Building release binary..."
 cargo build --release
 
-# --------------------------------------------------
-# 2. Attempt to build distribution bundles via cargo-bundle
-# --------------------------------------------------
+# 3. Check for cargo-bundle
 BUNDLED=false
-
 if command -v cargo-bundle &> /dev/null; then
-    echo "cargo-bundle detected. Building distribution packages..."
+    echo "Building bundles (.deb, .rpm) using cargo-bundle..."
     cargo bundle --release
-
-    # Copy generated artifacts if present
-    [ -d "target/release/bundle/deb" ] && cp target/release/bundle/deb/*.deb build/ || true
-    [ -d "target/release/bundle/rpm" ] && cp target/release/bundle/rpm/*.rpm build/ || true
-    [ -d "target/release/bundle/appimage" ] && cp target/release/bundle/appimage/*.AppImage build/ || true
-
+    
+    # Copy produced bundles
+    [ -d "target/release/bundle/deb" ] && cp target/release/bundle/deb/*.deb build/
+    [ -d "target/release/bundle/rpm" ] && cp target/release/bundle/rpm/*.rpm build/
+    [ -d "target/release/bundle/appimage" ] && cp target/release/bundle/appimage/*.AppImage build/
     BUNDLED=true
 fi
 
-# --------------------------------------------------
-# 3. Fallback to alternative packaging tools
-# --------------------------------------------------
+# 4. Fallback if cargo-bundle not found or failed
 if [ "$BUNDLED" = false ]; then
-    echo "cargo-bundle not available."
-    echo "Install with: cargo install cargo-bundle"
-    echo "Attempting fallback packaging methods..."
-
-    # Debian package
+    echo "Notice: cargo-bundle not found. To install it, run: cargo install cargo-bundle"
+    echo "Attempting fallback to cargo-deb if available..."
+    
+    # Fallback to cargo-deb
     if command -v cargo-deb &> /dev/null; then
-        echo "Building Debian package (.deb)..."
+        echo "Building .deb package..."
         cargo deb
-        cp target/debian/*.deb build/ || true
-    fi
-
-    # RPM package
-    if command -v cargo-generate-rpm &> /dev/null; then
-        echo "Building RPM package (.rpm)..."
-        cargo generate-rpm
-        cp target/generate-rpm/*.rpm build/ || true
+        cp target/debian/*.deb build/
     fi
 fi
 
-# --------------------------------------------------
-# 4. Build Arch Linux package using makepkg
-# --------------------------------------------------
+# 5. Build RPM package (cargo-generate-rpm)
+if command -v cargo-generate-rpm &> /dev/null; then
+    echo "Building .rpm package..."
+    cargo generate-rpm
+    cp target/generate-rpm/*.rpm build/
+else
+    echo "Warning: cargo-generate-rpm not found. Skipping .rpm build."
+fi
+
+# 6. Build Arch Linux Package (makepkg)
 if command -v makepkg &> /dev/null; then
     echo "Building Arch Linux package..."
-
-    # Extract version from Cargo.toml
+    # Get version from Cargo.toml
     VERSION=$(grep -m 1 '^version =' Cargo.toml | cut -d '"' -f 2)
     TARBALL="kaede-${VERSION}.tar.gz"
-
-    echo "Creating source archive: $TARBALL"
-
+    
+    # Create the source tarball makepkg expects
+    echo "Creating source tarball $TARBALL..."
     TMP_ARCHIVE=$(mktemp -d)
-
-    # Create a clean source tarball excluding build artifacts and VCS data
-    tar \
-        --exclude="./target" \
-        --exclude="./build" \
-        --exclude="./.git" \
-        --exclude="./pkg" \
-        --exclude="./$TARBALL" \
+    # Exclude only build artifacts and temp directories, keep source tree
+    tar --exclude="./target" --exclude="./build" --exclude="./.git" \
+        --exclude="./pkg" --exclude="./$TARBALL" \
         -czf "$TMP_ARCHIVE/$TARBALL" .
 
-    # Use an isolated directory to prevent makepkg from modifying the source tree
+    # Use a separate temporary directory for makepkg so its src/ doesn't touch our project src/
     ARCH_BUILD_DIR=$(mktemp -d)
-
     cp PKGBUILD "$ARCH_BUILD_DIR/"
     mv "$TMP_ARCHIVE/$TARBALL" "$ARCH_BUILD_DIR/"
     rmdir "$TMP_ARCHIVE"
 
-    echo "Running makepkg in isolated directory: $ARCH_BUILD_DIR"
-
+    echo "Running makepkg in isolated dir: $ARCH_BUILD_DIR"
     pushd "$ARCH_BUILD_DIR" > /dev/null
     PKGEXT='.pkg.tar.zst'
     makepkg -f --noprogressbar --nodeps
-    cp ./*.pkg.tar.zst "$OLDPWD/build/" || true
+    cp ./*.pkg.tar.zst "$OLDPWD/build/"
     popd > /dev/null
 
-    # Clean up temporary build directory
+    # Cleanup temporary Arch build directory
     rm -rf "$ARCH_BUILD_DIR"
 else
-    echo "makepkg not found. Skipping Arch Linux package."
+    echo "Warning: makepkg not found. Skipping Arch Linux build."
 fi
 
-# --------------------------------------------------
-# 5. Build Nix package
-# --------------------------------------------------
+# 6. Build NixOS Package
 if command -v nix-build &> /dev/null; then
-    echo "Building Nix package (kaede-beta)..."
+    echo "Building NixOS package (kaede-beta)..."
     nix-build default.nix -o result-nix
     cp -rL result-nix build/kaede-beta-nixos
     rm result-nix
 else
-    echo "nix-build not available. Skipping Nix package."
+    echo "Warning: nix-build not found. Skipping NixOS build."
 fi
 
-echo "--- Build completed successfully ---"
-echo "Artifacts available in ./build"
+echo "--- Build Finished! Artifacts are in the 'build' directory ---"
 ls -lh build/
