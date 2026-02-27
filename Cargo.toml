@@ -1,12 +1,20 @@
 [package]
 name = "kaede"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
+description = "Linux desktop app (GTK4/libadwaita) to assign apps and games to a specific GPU"
+license = "GPL-3.0-only"
 
 [package.metadata.bundle]
 name = "Kaede"
-identifier = "com.kaede.Kaede"
+identifier = "com.kaede.gpu-manager"
 icon = ["src/icons/icon.png"]
+
+[package.metadata.generate-rpm]
+assets = [
+  { source = "target/release/kaede", dest = "/usr/bin/kaede", mode = "755" },
+  { source = "com.kaede.gpu-manager.desktop", dest = "/usr/share/applications/com.kaede.gpu-manager.desktop", mode = "644" },
+]
 
 [dependencies]
 adw = { package = "libadwaita", version = "0.7" }

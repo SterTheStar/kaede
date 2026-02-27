@@ -146,7 +146,9 @@ fn apply_env_to_heroic_json(json: &mut Value, app_name: &str, env_vars: &[String
         .ok_or_else(|| anyhow::anyhow!("Heroic game config root is not a JSON object"))?;
 
     let mut desired = env_pairs_to_map(env_vars);
-    desired.insert(KAEDE_MARKER_KEY.to_string(), Value::String("1".to_string()));
+    if !env_vars.is_empty() {
+        desired.insert(KAEDE_MARKER_KEY.to_string(), Value::String("1".to_string()));
+    }
 
     let mut changed = false;
 
@@ -186,7 +188,9 @@ fn apply_env_to_heroic_json(json: &mut Value, app_name: &str, env_vars: &[String
 
 fn validate_env_in_heroic_json(json: &Value, app_name: &str, env_vars: &[String]) -> bool {
     let mut desired = env_pairs_to_map(env_vars);
-    desired.insert(KAEDE_MARKER_KEY.to_string(), Value::String("1".to_string()));
+    if !env_vars.is_empty() {
+        desired.insert(KAEDE_MARKER_KEY.to_string(), Value::String("1".to_string()));
+    }
 
     let top_ok = match json.get("envVariables") {
         Some(env) => match env {
@@ -239,6 +243,7 @@ fn remove_absent_managed(env_obj: &mut Map<String, Value>, desired: &Map<String,
         "__VK_LAYER_NV_optimus",
         "MESA_VK_DEVICE_SELECT",
         "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE",
+        "DXVK_FILTER_DEVICE_NAME",
         KAEDE_MARKER_KEY,
     ];
 
@@ -282,6 +287,7 @@ fn remove_absent_managed_array(arr: &mut Vec<Value>, desired: &Map<String, Value
         "__VK_LAYER_NV_optimus",
         "MESA_VK_DEVICE_SELECT",
         "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE",
+        "DXVK_FILTER_DEVICE_NAME",
         KAEDE_MARKER_KEY,
     ];
 
@@ -324,6 +330,7 @@ fn upsert_game_enviroment_options(
         "__VK_LAYER_NV_optimus",
         "MESA_VK_DEVICE_SELECT",
         "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE",
+        "DXVK_FILTER_DEVICE_NAME",
         KAEDE_MARKER_KEY,
     ];
 

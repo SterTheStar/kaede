@@ -1,5 +1,5 @@
 pkgname=kaede
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="Linux desktop app to choose which GPU to use per app/game"
 arch=('x86_64')

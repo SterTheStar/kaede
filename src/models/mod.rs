@@ -13,6 +13,39 @@ pub struct GpuInfo {
     pub renderer: Option<String>,
 }
 
+impl GpuInfo {
+    pub fn name_for_filter(&self) -> String {
+        let source = self
+            .renderer
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or(&self.name);
+
+        let mut cleaned = source.trim().to_string();
+
+        if let Some((_, rhs)) = cleaned.split_once(':') {
+            cleaned = rhs.trim().to_string();
+        }
+
+        for suffix in ["(TM)", "(tm)", "(R)", "(r)", "Corporation", "Inc."] {
+            cleaned = cleaned.replace(suffix, "");
+        }
+
+        for splitter in [" (", ", ", " [", " / "] {
+            if let Some((left, _)) = cleaned.split_once(splitter) {
+                cleaned = left.trim().to_string();
+            }
+        }
+
+        if let Some(pos) = cleaned.find("Series") {
+            let keep = &cleaned[..pos + "Series".len()];
+            cleaned = keep.trim().to_string();
+        }
+
+        cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DesktopApp {
     pub desktop_id: String,

@@ -331,6 +331,13 @@ fn strip_managed_prefix(value: &str) -> String {
             }
             out.push_str(value[end..].trim_start());
             return out.trim().to_string();
+        } else {
+            // Fallback: if start marker exists but end marker is missing,
+            // we at least try to remove the start marker literal and hope for the best.
+            // This handles leftovers from potentially interrupted writes or old versions.
+            let mut out = value.to_string();
+            out.replace_range(start..start + KAEDE_STEAM_START.len(), "");
+            return out.trim().to_string();
         }
     }
 

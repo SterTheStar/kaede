@@ -2,7 +2,7 @@
 
 pkgs.rustPlatform.buildRustPackage rec {
   pname = "kaede-beta";
-  version = "1.0.0";
+  version = "1.0.1";
 
   src = ./.;
 
