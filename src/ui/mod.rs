@@ -11,7 +11,7 @@ const APP_NAME: &str = "Kaede";
 const APP_DESCRIPTION: &str =
     "Select and manage GPU assignments for apps, games, and launchers on Linux.";
 const APP_AUTHOR: &str = "Esther";
-const APP_GITHUB: &str = "https://github.com/esther/KaedeGPU";
+const APP_GITHUB: &str = "https://github.com/SterTheStar/kaede";
 const APP_LICENSE: &str = "GNU GPL-3.0";
 // Use the installed themed icon name so it works from the packaged build.
 const APP_ICON_PATH: &str = "com.kaede.gpu-manager";
@@ -41,6 +41,26 @@ pub fn build_ui(app: &adw::Application) {
         gpus: detect_gpus(),
         apps: scan_desktop_entries(),
     }));
+
+    // Add CSS for the update notification dot
+    let provider = gtk::CssProvider::new();
+    provider.load_from_data("
+        .update-dot {
+            background-color: #2ec27e;
+            min-width: 8px;
+            min-height: 8px;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+    ");
+    if let Some(display) = gtk::gdk::Display::default() {
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
+
     let config = Rc::new(RefCell::new(ConfigStore::load()));
     let visible_apps: Rc<RefCell<Vec<DesktopApp>>> = Rc::new(RefCell::new(Vec::new()));
     let selected_app_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
@@ -75,10 +95,28 @@ pub fn build_ui(app: &adw::Application) {
         .icon_name("emblem-system-symbolic")
         .tooltip_text("NVIDIA graphics mode")
         .build();
-    let about_btn = gtk::Button::builder()
-        .icon_name("dialog-information-symbolic")
-        .tooltip_text("About Kaede")
+
+    // Create About button with an overlay for the update dot
+    let about_icon = gtk::Image::from_icon_name("dialog-information-symbolic");
+    let about_dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    about_dot.add_css_class("update-dot");
+    about_dot.set_halign(gtk::Align::End);
+    about_dot.set_valign(gtk::Align::End);
+    about_dot.set_margin_end(1);
+    about_dot.set_margin_bottom(2);
+    about_dot.set_visible(false);
+
+    let about_overlay = gtk::Overlay::builder()
+        .child(&about_icon)
         .build();
+    about_overlay.add_overlay(&about_dot);
+
+    let about_btn = gtk::Button::builder()
+        .child(&about_overlay)
+        .tooltip_text("About Kaede")
+        .css_classes(vec!["flat".to_string()])
+        .build();
+
     header.pack_end(&settings_btn);
     header.pack_end(&about_btn);
     header.pack_end(&refresh_btn);
@@ -557,8 +595,9 @@ pub fn build_ui(app: &adw::Application) {
 
     {
         let window = window.clone();
+        let about_dot_c = about_dot.clone();
         about_btn.connect_clicked(move |_| {
-            show_about_dialog(&window);
+            show_about_dialog(&window, Some(about_dot_c.clone().upcast()));
         });
     }
 
@@ -732,4 +771,48 @@ pub fn build_ui(app: &adw::Application) {
 
     window.set_content(Some(&root));
     window.present();
+
+    // Startup update check
+    if config.borrow().check_updates_at_startup() {
+        info!("Starting background update check...");
+        let (tx, rx) = std::sync::mpsc::channel::<crate::updates::UpdateResult>();
+        std::thread::spawn(move || {
+            if let Ok(res) = crate::updates::check_for_updates() {
+                let _ = tx.send(res);
+            }
+        });
+
+        let window_c = window.clone();
+        let about_dot_c = about_dot.clone();
+        glib::idle_add_local(move || {
+            match rx.try_recv() {
+                Ok(res) => {
+                    if let crate::updates::UpdateResult::NewRelease(latest) = res {
+                        about_dot_c.set_visible(true);
+                        let dlg = gtk::MessageDialog::builder()
+                            .transient_for(&window_c)
+                            .modal(true)
+                            .message_type(gtk::MessageType::Question)
+                            .text("New update available!")
+                            .secondary_text(&format!("A new version of Kaede ({}) is available on GitHub. Would you like to update now?", latest))
+                            .build();
+                        
+                        dlg.add_button("Later", gtk::ResponseType::Cancel);
+                        dlg.add_button("Update", gtk::ResponseType::Ok);
+
+                        dlg.connect_response(move |d, res| {
+                            if res == gtk::ResponseType::Ok {
+                                let _ = gio::AppInfo::launch_default_for_uri("https://github.com/SterTheStar/kaede/releases", None::<&gio::AppLaunchContext>);
+                            }
+                            d.close();
+                        });
+                        dlg.present();
+                    }
+                    glib::ControlFlow::Break
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => glib::ControlFlow::Break,
+            }
+        });
+    }
 }

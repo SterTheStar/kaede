@@ -85,6 +85,14 @@ impl ConfigStore {
         self.data.skip_nvidia_warning = value;
     }
 
+    pub fn check_updates_at_startup(&self) -> bool {
+        self.data.check_updates_at_startup
+    }
+
+    pub fn set_check_updates_at_startup(&mut self, value: bool) {
+        self.data.check_updates_at_startup = value;
+    }
+
     pub fn reset(&mut self) -> Result<()> {
         self.data = AppConfig::default();
         self.save()

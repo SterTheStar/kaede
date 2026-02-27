@@ -98,6 +98,8 @@ pub struct AppConfig {
     pub use_env_wrapper: bool,
     #[serde(default)]
     pub skip_nvidia_warning: bool,
+    #[serde(default = "default_true")]
+    pub check_updates_at_startup: bool,
 }
 
 fn default_true() -> bool {
@@ -113,6 +115,7 @@ impl Default for AppConfig {
             show_flatpak_apps: true,
             use_env_wrapper: false,
             skip_nvidia_warning: false,
+            check_updates_at_startup: true,
         }
     }
 }

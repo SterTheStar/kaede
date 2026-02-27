@@ -8,6 +8,7 @@ mod models;
 mod nvidia;
 mod steam;
 mod ui;
+mod updates;
 
 use adw::prelude::*;
 

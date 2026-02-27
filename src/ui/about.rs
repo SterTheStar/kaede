@@ -2,7 +2,7 @@ use adw::prelude::*;
 
 use super::{APP_AUTHOR, APP_DESCRIPTION, APP_GITHUB, APP_LICENSE, APP_NAME};
 
-pub(crate) fn show_about_dialog(window: &adw::ApplicationWindow) {
+pub(crate) fn show_about_dialog(window: &adw::ApplicationWindow, update_dot: Option<gtk::Widget>) {
     let dialog = gtk::Dialog::builder()
         .transient_for(window)
         .modal(true)
@@ -64,13 +64,65 @@ pub(crate) fn show_about_dialog(window: &adw::ApplicationWindow) {
         .title("Project")
         .subtitle("Source code and issue tracker")
         .build();
-    let github = gtk::LinkButton::with_label(APP_GITHUB, "GitHub Repository");
+    let github = gtk::LinkButton::new(APP_GITHUB);
+    github.set_label("GitHub Repository");
     github.add_css_class("flat");
     github_row.add_suffix(&github);
     github_row.set_activatable_widget(Some(&github));
     list.append(&github_row);
 
     wrapper.append(&list);
+
+    // Update check in background using a standard channel and glib idle loop
+    let (tx, rx) = std::sync::mpsc::channel::<crate::updates::UpdateResult>();
+    std::thread::spawn(move || {
+        if let Ok(res) = crate::updates::check_for_updates() {
+            let _ = tx.send(res);
+        }
+    });
+
+    let version_label = version.clone();
+    glib::idle_add_local(move || {
+        if let Ok(res) = rx.try_recv() {
+            use crate::updates::UpdateResult::*;
+            match res {
+                NewRelease(latest) => {
+                    if let Some(ref dot) = update_dot {
+                        dot.set_visible(true);
+                    }
+                    version_label.set_markup(&format!(
+                        "Version {} <span color='#2ec27e' weight='bold'>(New version: {})</span>",
+                        env!("CARGO_PKG_VERSION"),
+                        latest
+                    ));
+                    
+                    // Make the version label clickable to download
+                    let click = gtk::GestureClick::new();
+                    click.connect_released(|_, _, _, _| {
+                        let _ = gio::AppInfo::launch_default_for_uri("https://github.com/SterTheStar/kaede/releases", None::<&gio::AppLaunchContext>);
+                    });
+                    version_label.add_controller(click);
+                    version_label.set_cursor_from_name(Some("pointer"));
+                }
+                Beta => {
+                    version_label.set_markup(&format!(
+                        "Version {} <span color='#3584e4' weight='bold'>(Development)</span>",
+                        env!("CARGO_PKG_VERSION")
+                    ));
+                }
+                UpToDate => {
+                    version_label.set_markup(&format!(
+                        "Version {} <span color='#818181'>(Latest)</span>",
+                        env!("CARGO_PKG_VERSION")
+                    ));
+                }
+            }
+            glib::ControlFlow::Break
+        } else {
+            glib::ControlFlow::Continue
+        }
+    });
+
     content.append(&wrapper);
     dialog.present();
 }

@@ -96,6 +96,16 @@ pub(crate) fn build_settings_widget(
     use_env_row.set_activatable_widget(Some(&use_env_switch));
     app_list.append(&use_env_row);
 
+    let check_updates_switch = gtk::Switch::builder().valign(gtk::Align::Center).build();
+    check_updates_switch.set_active(config.borrow().check_updates_at_startup());
+    let check_updates_row = adw::ActionRow::builder()
+        .title("Check for updates on startup")
+        .subtitle("Automatically check for new versions on GitHub when opening Kaede")
+        .build();
+    check_updates_row.add_suffix(&check_updates_switch);
+    check_updates_row.set_activatable_widget(Some(&check_updates_switch));
+    app_list.append(&check_updates_row);
+
     let reset_cfg_btn = gtk::Button::builder()
         .label("Clear all app data")
         .valign(gtk::Align::Center)
@@ -212,7 +222,6 @@ pub(crate) fn build_settings_widget(
     
     {
         let stack = nvidia_main_stack.clone();
-        let scroll = nvidia_scrolled.clone();
         let config = config.clone();
         let skip_warning_check = skip_warning_check.clone();
         agree_btn.connect_clicked(move |_| {
@@ -445,6 +454,7 @@ pub(crate) fn build_settings_widget(
     on_change!(show_heroic_switch, connect_active_notify);
     on_change!(show_flatpak_switch, connect_active_notify);
     on_change!(use_env_switch, connect_active_notify);
+    on_change!(check_updates_switch, connect_active_notify);
     on_change!(mode_dropdown, connect_selected_notify);
     on_change!(force_switch, connect_active_notify);
     on_change!(coolbits_switch, connect_active_notify);
@@ -568,6 +578,7 @@ pub(crate) fn build_settings_widget(
                 cfg.set_show_heroic_apps(show_heroic_switch.is_active());
                 cfg.set_show_flatpak_apps(show_flatpak_switch.is_active());
                 cfg.set_use_env_wrapper(use_env_switch.is_active());
+                cfg.set_check_updates_at_startup(check_updates_switch.is_active());
                 if let Err(err) = cfg.save() {
                     error!(%err, "failed to save app settings");
                 }
