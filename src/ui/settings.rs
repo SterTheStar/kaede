@@ -18,28 +18,16 @@ fn has_nvidia_gpu(gpus: &[GpuInfo]) -> bool {
     })
 }
 
-pub(crate) fn show_settings_dialog(
-    parent: &adw::ApplicationWindow,
+pub(crate) fn build_settings_widget(
+    window: &adw::ApplicationWindow,
     gpus: &[GpuInfo],
     config: &Rc<RefCell<ConfigStore>>,
-) {
+) -> (gtk::Box, adw::ViewSwitcher) {
     let has_nvidia = has_nvidia_gpu(gpus);
     let current_mode = get_current_mode();
 
-    let window = adw::Window::builder()
-        .transient_for(parent)
-        .modal(true)
-        .title("Kaede settings")
-        .default_width(960)
-        .default_height(540)
-        .build();
-
     let stack = adw::ViewStack::new();
     stack.set_vexpand(true);
-    let switcher = adw::ViewSwitcher::new();
-    switcher.set_stack(Some(&stack));
-    switcher.set_halign(gtk::Align::Center);
-    switcher.set_hexpand(true);
 
     // Application-wide settings (General tab)
     let general_scrolled = gtk::ScrolledWindow::builder()
@@ -237,47 +225,14 @@ pub(crate) fn show_settings_dialog(
     let nvid_page = stack.add_titled(&nvidia_scrolled, Some("nvidia"), "NVIDIA & power");
     nvid_page.set_icon_name(Some("emblem-system-symbolic"));
 
-    let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    root.set_margin_top(12);
-    root.set_margin_bottom(12);
-    root.set_margin_start(12);
-    root.set_margin_end(12);
-
-    let header_row = gtk::CenterBox::new();
-    header_row.set_margin_bottom(8);
-
-    let title_label = gtk::Label::new(None);
-    title_label.set_markup("<b>Settings</b>");
-    title_label.set_xalign(0.0);
-    title_label.set_margin_start(6);
-    title_label.set_margin_top(2);
-    header_row.set_start_widget(Some(&title_label));
+    let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    root.set_vexpand(true);
 
     let switcher = adw::ViewSwitcher::builder()
         .stack(&stack)
         .policy(adw::ViewSwitcherPolicy::Wide)
         .build();
-    header_row.set_center_widget(Some(&switcher));
 
-    let close_img = gtk::Image::from_icon_name("window-close-symbolic");
-    close_img.set_pixel_size(18);
-
-    let close_btn = gtk::Button::builder()
-        .child(&close_img)
-        .build();
-    close_btn.add_css_class("circular");
-    close_btn.set_size_request(26, 26);
-    close_btn.set_valign(gtk::Align::Start);
-    close_btn.set_halign(gtk::Align::End);
-    {
-        let window = window.clone();
-        close_btn.connect_clicked(move |_| {
-            window.close();
-        });
-    }
-    header_row.set_end_widget(Some(&close_btn));
-
-    root.append(&header_row);
     root.append(&stack);
 
     if !has_nvidia {
@@ -314,8 +269,6 @@ pub(crate) fn show_settings_dialog(
     button_box.append(&apply_btn);
     root.append(&button_box);
 
-    window.set_content(Some(&root));
-
     if !has_nvidia {
         reset_btn.set_sensitive(false);
         reset_sddm_btn.set_sensitive(false);
@@ -350,14 +303,12 @@ pub(crate) fn show_settings_dialog(
     }
 
     {
-        let parent = parent.clone();
         let window = window.clone();
         reset_btn.connect_clicked(move |_| {
-            window.close();
             match reset_all() {
                 Ok(()) => {
                     let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
+                        .transient_for(&window)
                         .modal(true)
                         .message_type(gtk::MessageType::Info)
                         .text("NVIDIA configuration reset")
@@ -370,7 +321,7 @@ pub(crate) fn show_settings_dialog(
                 Err(err) => {
                     error!(%err, "failed to reset NVIDIA configuration");
                     let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
+                        .transient_for(&window)
                         .modal(true)
                         .message_type(gtk::MessageType::Error)
                         .text("Failed to reset NVIDIA configuration")
@@ -385,14 +336,12 @@ pub(crate) fn show_settings_dialog(
     }
 
     {
-        let parent = parent.clone();
         let window = window.clone();
         reset_sddm_btn.connect_clicked(move |_| {
-            window.close();
             match reset_sddm() {
                 Ok(()) => {
                     let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
+                        .transient_for(&window)
                         .modal(true)
                         .message_type(gtk::MessageType::Info)
                         .text("SDDM Xsetup reset")
@@ -405,7 +354,7 @@ pub(crate) fn show_settings_dialog(
                 Err(err) => {
                     error!(%err, "failed to reset SDDM Xsetup");
                     let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
+                        .transient_for(&window)
                         .modal(true)
                         .message_type(gtk::MessageType::Error)
                         .text("Failed to reset SDDM Xsetup")
@@ -499,6 +448,6 @@ pub(crate) fn show_settings_dialog(
         });
     }
 
-    window.present();
+    (root, switcher)
 }
 

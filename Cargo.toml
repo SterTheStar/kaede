@@ -1,6 +1,6 @@
 [package]
 name = "kaede"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 description = "Linux desktop app (GTK4/libadwaita) to assign apps and games to a specific GPU"
 license = "GPL-3.0-only"

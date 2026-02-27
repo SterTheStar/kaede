@@ -25,7 +25,7 @@ mod util;
 use self::about::show_about_dialog;
 use self::app_list::rebuild_app_list;
 use self::details::{set_app_details, set_app_details_empty, AppDetailsWidgets};
-use self::settings::show_settings_dialog;
+use self::settings::build_settings_widget;
 use self::util::{set_details_panel_visible, widget_is_descendant_of};
 
 #[derive(Clone)]
@@ -59,6 +59,13 @@ pub fn build_ui(app: &adw::Application) {
     let header = adw::HeaderBar::new();
     let title = adw::WindowTitle::builder().title("Kaede").build();
     header.set_title_widget(Some(&title));
+
+    let back_btn = gtk::Button::builder()
+        .icon_name("go-previous-symbolic")
+        .tooltip_text("Back")
+        .build();
+    back_btn.set_visible(false);
+    header.pack_start(&back_btn);
 
     let refresh_btn = gtk::Button::builder()
         .icon_name("view-refresh-symbolic")
@@ -143,7 +150,18 @@ pub fn build_ui(app: &adw::Application) {
     content.set_margin_bottom(12);
     content.set_margin_start(12);
     content.set_margin_end(12);
-    root.append(&content);
+    // Content stack: switches between apps view and settings view
+    let content_stack = gtk::Stack::new();
+    content_stack.set_vexpand(true);
+    content_stack.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    content_stack.set_transition_duration(220);
+    content_stack.add_named(&content, Some("apps"));
+
+    let settings_slot = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    settings_slot.set_vexpand(true);
+    content_stack.add_named(&settings_slot, Some("settings"));
+
+    root.append(&content_stack);
 
     let apps_box = gtk::ListBox::new();
     apps_box.add_css_class("boxed-list");
@@ -247,9 +265,9 @@ pub fn build_ui(app: &adw::Application) {
 
     let desktop_header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     desktop_header.set_margin_top(8);
-    desktop_header.set_margin_bottom(4);
+    desktop_header.set_margin_bottom(8);
     desktop_header.set_margin_start(12);
-    desktop_header.set_margin_end(12);
+    desktop_header.set_margin_end(8);
 
     let desktop_title = gtk::Label::new(Some(".desktop file"));
     desktop_title.set_xalign(0.0);
@@ -258,6 +276,7 @@ pub fn build_ui(app: &adw::Application) {
 
     let desktop_open_button = gtk::Button::with_label("Open in editor");
     desktop_open_button.add_css_class("flat");
+    desktop_open_button.set_valign(gtk::Align::Center);
 
     desktop_header.append(&desktop_title);
     desktop_header.append(&desktop_open_button);
@@ -610,9 +629,51 @@ pub fn build_ui(app: &adw::Application) {
         let window = window.clone();
         let state = state.clone();
         let config = config.clone();
+        let content_stack = content_stack.clone();
+        let settings_slot = settings_slot.clone();
+        let back_btn = back_btn.clone();
+        let settings_btn_ref = settings_btn.clone();
+        let refresh_btn_ref = refresh_btn.clone();
+        let about_btn_ref = about_btn.clone();
+        let search_slot = search_slot.clone();
+        let title = title.clone();
+        let header = header.clone();
         settings_btn.connect_clicked(move |_| {
+            while let Some(child) = settings_slot.first_child() {
+                settings_slot.remove(&child);
+            }
             let gpus = state.borrow().gpus.clone();
-            show_settings_dialog(&window, &gpus, &config);
+            let (widget, switcher) = build_settings_widget(&window, &gpus, &config);
+            settings_slot.append(&widget);
+            header.set_title_widget(Some(&switcher));
+            content_stack.set_visible_child_name("settings");
+            back_btn.set_visible(true);
+            settings_btn_ref.set_visible(false);
+            refresh_btn_ref.set_visible(false);
+            about_btn_ref.set_visible(false);
+            search_slot.set_visible(false);
+            title.set_title("Settings");
+        });
+    }
+
+    {
+        let content_stack = content_stack.clone();
+        let back_btn_ref = back_btn.clone();
+        let settings_btn = settings_btn.clone();
+        let refresh_btn = refresh_btn.clone();
+        let about_btn = about_btn.clone();
+        let search_slot = search_slot.clone();
+        let title = title.clone();
+        let header = header.clone();
+        back_btn.connect_clicked(move |_| {
+            content_stack.set_visible_child_name("apps");
+            header.set_title_widget(Some(&title));
+            back_btn_ref.set_visible(false);
+            settings_btn.set_visible(true);
+            refresh_btn.set_visible(true);
+            about_btn.set_visible(true);
+            search_slot.set_visible(true);
+            title.set_title("Kaede");
         });
     }
 
