@@ -24,15 +24,17 @@ pub(crate) fn rebuild_app_list(
     filter: &str,
     details_widgets: &AppDetailsWidgets,
     selected_app_id: &Rc<RefCell<Option<String>>>,
+    ui_filter: (bool, bool, bool, bool), // (steam, heroic, flatpak, native)
 ) {
     clear_listbox(list);
     visible_apps.borrow_mut().clear();
     let gpus_shared = Rc::new(gpus.to_vec());
     let normalized = filter.to_lowercase();
     let cfg = config.borrow();
-    let show_steam = cfg.show_steam_apps();
-    let show_heroic = cfg.show_heroic_apps();
-    let show_flatpak = cfg.show_flatpak_apps();
+    let show_steam = cfg.show_steam_apps() && ui_filter.0;
+    let show_heroic = cfg.show_heroic_apps() && ui_filter.1;
+    let show_flatpak = cfg.show_flatpak_apps() && ui_filter.2;
+    let show_native = ui_filter.3;
 
     for app in apps {
         if app.is_steam_game && !show_steam {
@@ -42,6 +44,10 @@ pub(crate) fn rebuild_app_list(
             continue;
         }
         if app.is_flatpak && !show_flatpak {
+            continue;
+        }
+        let is_native = !app.is_steam_game && !app.is_heroic_game && !app.is_flatpak;
+        if is_native && !show_native {
             continue;
         }
         if !normalized.is_empty() && !app.name.to_lowercase().contains(&normalized) {

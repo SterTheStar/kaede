@@ -44,6 +44,9 @@ pub fn build_ui(app: &adw::Application) {
     let config = Rc::new(RefCell::new(ConfigStore::load()));
     let visible_apps: Rc<RefCell<Vec<DesktopApp>>> = Rc::new(RefCell::new(Vec::new()));
     let selected_app_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    // (steam, heroic, flatpak, native) — session-level filter, independent of settings
+    let ui_filter: Rc<RefCell<(bool, bool, bool, bool)>> = Rc::new(RefCell::new((true, true, true, true)));
+    let filter_suspended: Rc<std::cell::Cell<bool>> = Rc::new(std::cell::Cell::new(false));
 
     let window = adw::ApplicationWindow::builder()
         .application(app)
@@ -85,9 +88,51 @@ pub fn build_ui(app: &adw::Application) {
     search_overlay.set_child(Some(&search));
     search_overlay.set_visible(false);
 
-    let search_slot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let search_slot = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     search_slot.append(&search_btn);
     search_slot.append(&search_overlay);
+
+    // Filter popover content
+    let filter_popover_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    filter_popover_box.set_margin_top(8);
+    filter_popover_box.set_margin_bottom(8);
+    filter_popover_box.set_margin_start(12);
+    filter_popover_box.set_margin_end(12);
+
+    let steam_check = gtk::CheckButton::with_label("Steam games");
+    steam_check.set_active(true);
+    let heroic_check = gtk::CheckButton::with_label("Heroic games");
+    heroic_check.set_active(true);
+    let flatpak_check = gtk::CheckButton::with_label("Flatpak apps");
+    flatpak_check.set_active(true);
+    let native_check = gtk::CheckButton::with_label("Native / Desktop");
+    native_check.set_active(true);
+
+    let filter_sep = gtk::Separator::new(gtk::Orientation::Horizontal);
+    filter_sep.set_margin_top(6);
+    filter_sep.set_margin_bottom(2);
+
+    let clear_filters_btn = gtk::Button::with_label("Clear filters");
+    clear_filters_btn.add_css_class("flat");
+    clear_filters_btn.set_halign(gtk::Align::Center);
+
+    filter_popover_box.append(&steam_check);
+    filter_popover_box.append(&heroic_check);
+    filter_popover_box.append(&flatpak_check);
+    filter_popover_box.append(&native_check);
+    filter_popover_box.append(&filter_sep);
+    filter_popover_box.append(&clear_filters_btn);
+
+    let filter_popover = gtk::Popover::new();
+    filter_popover.set_child(Some(&filter_popover_box));
+
+    let filter_menu_btn = gtk::MenuButton::new();
+    filter_menu_btn.set_icon_name("view-list-symbolic");
+    filter_menu_btn.set_tooltip_text(Some("Filter apps by source"));
+    filter_menu_btn.set_popover(Some(&filter_popover));
+    filter_menu_btn.set_valign(gtk::Align::Center);
+
+    search_slot.append(&filter_menu_btn);
     header.pack_start(&search_slot);
 
     let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -312,6 +357,7 @@ pub fn build_ui(app: &adw::Application) {
             "",
             &details_widgets,
             &selected_app_id,
+            *ui_filter.borrow(),
         );
     }
 
@@ -361,6 +407,7 @@ pub fn build_ui(app: &adw::Application) {
         let visible_apps = visible_apps.clone();
         let details_widgets = details_widgets.clone();
         let selected_app_id = selected_app_id.clone();
+        let ui_filter = ui_filter.clone();
         search.connect_search_changed(move |entry| {
             let text = entry.text().to_string();
             let data = state.borrow();
@@ -374,6 +421,7 @@ pub fn build_ui(app: &adw::Application) {
                 &text,
                 &details_widgets,
                 &selected_app_id,
+                *ui_filter.borrow(),
             );
         });
     }
@@ -430,6 +478,7 @@ pub fn build_ui(app: &adw::Application) {
         let refresh_btn_widget = refresh_btn.clone().upcast::<gtk::Widget>();
         let settings_btn_widget = settings_btn.clone().upcast::<gtk::Widget>();
         let about_btn_widget = about_btn.clone().upcast::<gtk::Widget>();
+        let filter_menu_btn_widget = filter_menu_btn.clone().upcast::<gtk::Widget>();
         let search_btn = search_btn.clone();
         let search_overlay = search_overlay.clone();
         let search_widget = search.clone().upcast::<gtk::Widget>();
@@ -456,9 +505,10 @@ pub fn build_ui(app: &adw::Application) {
             let in_refresh = widget_is_descendant_of(&picked, &refresh_btn_widget);
             let in_settings = widget_is_descendant_of(&picked, &settings_btn_widget);
             let in_about = widget_is_descendant_of(&picked, &about_btn_widget);
+            let in_filter = widget_is_descendant_of(&picked, &filter_menu_btn_widget);
 
             let is_action_widget =
-                in_search_btn || in_search_entry || in_refresh || in_settings || in_about;
+                in_search_btn || in_search_entry || in_refresh || in_settings || in_about || in_filter;
 
             if search_overlay.is_visible() && !in_search_entry {
                 if search.text().is_empty() {
@@ -493,6 +543,69 @@ pub fn build_ui(app: &adw::Application) {
         });
     }
 
+    // Filter CheckButton handlers (with suspend flag to avoid redundant rebuilds on Clear)
+    macro_rules! on_check_filter {
+        ($check:expr, $field:tt) => {{
+            let apps_box = apps_box.clone();
+            let window = window.clone();
+            let state = state.clone();
+            let config = config.clone();
+            let visible_apps = visible_apps.clone();
+            let search = search.clone();
+            let details_widgets = details_widgets.clone();
+            let selected_app_id = selected_app_id.clone();
+            let ui_filter = ui_filter.clone();
+            let filter_suspended = filter_suspended.clone();
+            $check.connect_toggled(move |check| {
+                if filter_suspended.get() { return; }
+                ui_filter.borrow_mut().$field = check.is_active();
+                let text = search.text().to_string();
+                let data = state.borrow();
+                rebuild_app_list(
+                    &apps_box, &window, &data.apps, &data.gpus,
+                    &config, &visible_apps, &text, &details_widgets, &selected_app_id,
+                    *ui_filter.borrow(),
+                );
+            });
+        }};
+    }
+    on_check_filter!(steam_check, 0);
+    on_check_filter!(heroic_check, 1);
+    on_check_filter!(flatpak_check, 2);
+    on_check_filter!(native_check, 3);
+
+    // Clear filters: reset all checks + rebuild once
+    {
+        let apps_box = apps_box.clone();
+        let window = window.clone();
+        let state = state.clone();
+        let config = config.clone();
+        let visible_apps = visible_apps.clone();
+        let search = search.clone();
+        let details_widgets = details_widgets.clone();
+        let selected_app_id = selected_app_id.clone();
+        let ui_filter = ui_filter.clone();
+        let filter_suspended = filter_suspended.clone();
+        let filter_popover = filter_popover.clone();
+        clear_filters_btn.connect_clicked(move |_| {
+            filter_suspended.set(true);
+            steam_check.set_active(true);
+            heroic_check.set_active(true);
+            flatpak_check.set_active(true);
+            native_check.set_active(true);
+            *ui_filter.borrow_mut() = (true, true, true, true);
+            filter_suspended.set(false);
+            filter_popover.popdown();
+            let text = search.text().to_string();
+            let data = state.borrow();
+            rebuild_app_list(
+                &apps_box, &window, &data.apps, &data.gpus,
+                &config, &visible_apps, &text, &details_widgets, &selected_app_id,
+                *ui_filter.borrow(),
+            );
+        });
+    }
+
     {
         let window = window.clone();
         let state = state.clone();
@@ -515,6 +628,7 @@ pub fn build_ui(app: &adw::Application) {
         let content = content.clone();
         let apps_scrolled = apps_scrolled.clone();
         let selected_app_id = selected_app_id.clone();
+        let ui_filter = ui_filter.clone();
 
         refresh_btn.connect_clicked(move |_| {
             info!("refresh requested: rescanning GPUs and applications");
@@ -536,6 +650,7 @@ pub fn build_ui(app: &adw::Application) {
                 &current_filter,
                 &details_widgets,
                 &selected_app_id,
+                *ui_filter.borrow(),
             );
 
             if let Some(selected) = selected_app_id.borrow().clone() {
