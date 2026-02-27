@@ -107,7 +107,7 @@ pub(crate) fn build_settings_widget(
     app_list.append(&check_updates_row);
 
     let reset_cfg_btn = gtk::Button::builder()
-        .label("Clear all app data")
+        .label("Clear cache")
         .valign(gtk::Align::Center)
         .build();
     reset_cfg_btn.add_css_class("destructive-action");
@@ -140,7 +140,7 @@ pub(crate) fn build_settings_widget(
                 .transient_for(&window)
                 .modal(true)
                 .message_type(gtk::MessageType::Question)
-                .text("Clear all app data?")
+                .text("Clear cache?")
                 .secondary_text("This will reset all your GPU assignments and settings to defaults. The application will close to apply changes.")
                 .build();
             dlg.add_button("Cancel", gtk::ResponseType::Cancel);
