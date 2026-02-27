@@ -68,6 +68,14 @@ impl ConfigStore {
     pub fn set_show_flatpak_apps(&mut self, value: bool) {
         self.data.show_flatpak_apps = value;
     }
+    
+    pub fn use_env_wrapper(&self) -> bool {
+        self.data.use_env_wrapper
+    }
+
+    pub fn set_use_env_wrapper(&mut self, value: bool) {
+        self.data.use_env_wrapper = value;
+    }
 }
 
 fn config_path() -> PathBuf {

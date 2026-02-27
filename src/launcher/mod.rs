@@ -14,19 +14,20 @@ pub fn apply_launcher_override(
     choice: &GpuChoice,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    use_env_wrapper: bool,
 ) -> Result<()> {
     if app.is_steam_game {
         if let Some(app_id) = app.steam_app_id.as_deref() {
             // Steam games should be configured through Steam LaunchOptions.
             let _ = remove_kaede_override_if_present(&user_launcher_path(&app.desktop_id));
-            let steam_env = steam_env_vars(choice, selected_gpu, all_gpus);
+            let steam_env = steam_env_vars(choice, selected_gpu, all_gpus, use_env_wrapper);
             info!(
                 app_id = app_id,
                 gpu_choice = %choice.label(),
                 env = ?steam_env,
                 "applying Steam LaunchOptions override"
             );
-            return apply_steam_launch_options(app_id, choice, &steam_env);
+            return apply_steam_launch_options(app_id, choice, &steam_env, use_env_wrapper);
         }
         warn!(
             desktop_id = %app.desktop_id,
@@ -41,7 +42,7 @@ pub fn apply_launcher_override(
         ) {
             let heroic_env = match choice {
                 GpuChoice::Default => Vec::new(),
-                GpuChoice::Gpu(index) => build_env_pairs(*index, false, selected_gpu, all_gpus),
+                GpuChoice::Gpu(index) => build_env_pairs(*index, false, selected_gpu, all_gpus, use_env_wrapper),
             };
             info!(
                 platform = platform,
@@ -68,7 +69,7 @@ pub fn apply_launcher_override(
                 mesa = profile.is_mesa,
                 "applying Flatpak override"
             );
-            return apply_flatpak_override(app_id, choice, selected_gpu, all_gpus);
+            return apply_flatpak_override(app_id, choice, selected_gpu, all_gpus, use_env_wrapper);
         }
         warn!(
             desktop_id = %app.desktop_id,
@@ -80,7 +81,7 @@ pub fn apply_launcher_override(
 
     match choice {
         GpuChoice::Default => remove_kaede_override_if_present(&target),
-        GpuChoice::Gpu(index) => write_override(app, *index, selected_gpu, all_gpus, &target),
+        GpuChoice::Gpu(index) => write_override(app, *index, selected_gpu, all_gpus, use_env_wrapper, &target),
     }
 }
 
@@ -89,6 +90,7 @@ fn apply_flatpak_override(
     choice: &GpuChoice,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    use_env_wrapper: bool,
 ) -> Result<()> {
     let mut cmd = Command::new("flatpak");
     cmd.args(["override", "--user"]);
@@ -109,7 +111,7 @@ fn apply_flatpak_override(
             ]);
         }
         GpuChoice::Gpu(index) => {
-            for env in build_env_pairs(*index, false, selected_gpu, all_gpus) {
+            for env in build_env_pairs(*index, false, selected_gpu, all_gpus, use_env_wrapper) {
                 cmd.arg(format!("--env={env}"));
             }
             cmd.arg(app_id);
@@ -133,6 +135,7 @@ fn write_override(
     index: usize,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    use_env_wrapper: bool,
     target: &Path,
 ) -> Result<()> {
     if app.path == target && !file_contains_marker(target) {
@@ -151,7 +154,7 @@ fn write_override(
     let original_exec = desktop_exec_value(&source_content)
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| app.exec.clone());
-    let wrapped_exec = wrap_exec_for_gpu(&original_exec, index, selected_gpu, all_gpus);
+    let wrapped_exec = wrap_exec_for_gpu(&original_exec, index, selected_gpu, all_gpus, use_env_wrapper);
     let content = rewrite_desktop_override_content(&source_content, &wrapped_exec, app);
 
     fs::write(target, content)
@@ -165,15 +168,17 @@ fn wrap_exec_for_gpu(
     index: usize,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    use_env_wrapper: bool,
 ) -> String {
     let is_steam = is_steam_exec(exec);
-    let env_pairs = build_env_pairs(index, is_steam, selected_gpu, all_gpus);
+    let env_pairs = build_env_pairs(index, is_steam, selected_gpu, all_gpus, use_env_wrapper);
 
     if looks_like_flatpak_run(exec) {
         return wrap_flatpak_run_with_env(exec, &env_pairs);
     }
 
-    format!("env {} {}", env_pairs.join(" "), exec)
+    let prefix = if use_env_wrapper { "env " } else { "" };
+    format!("{}{} {}", prefix, env_pairs.join(" "), exec)
 }
 
 fn build_env_pairs(
@@ -181,6 +186,7 @@ fn build_env_pairs(
     is_steam: bool,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    _use_env_wrapper: bool,
 ) -> Vec<String> {
     let profile = gpu_profile(selected_gpu);
     let mut env_pairs = vec![format!("DRI_PRIME={index}")];
@@ -245,10 +251,11 @@ fn steam_env_vars(
     choice: &GpuChoice,
     selected_gpu: Option<&GpuInfo>,
     all_gpus: &[GpuInfo],
+    use_env_wrapper: bool,
 ) -> Vec<String> {
     match choice {
         GpuChoice::Default => Vec::new(),
-        GpuChoice::Gpu(index) => build_env_pairs(*index, true, selected_gpu, all_gpus),
+        GpuChoice::Gpu(index) => build_env_pairs(*index, true, selected_gpu, all_gpus, use_env_wrapper),
     }
 }
 

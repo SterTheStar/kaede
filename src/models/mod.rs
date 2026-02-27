@@ -94,6 +94,8 @@ pub struct AppConfig {
     pub show_heroic_apps: bool,
     #[serde(default = "default_true")]
     pub show_flatpak_apps: bool,
+    #[serde(default)]
+    pub use_env_wrapper: bool,
 }
 
 fn default_true() -> bool {
@@ -107,6 +109,7 @@ impl Default for AppConfig {
             show_steam_apps: true,
             show_heroic_apps: true,
             show_flatpak_apps: true,
+            use_env_wrapper: false,
         }
     }
 }

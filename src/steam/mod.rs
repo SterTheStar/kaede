@@ -12,6 +12,7 @@ pub fn apply_steam_launch_options(
     app_id: &str,
     choice: &GpuChoice,
     managed_env: &[String],
+    use_env_wrapper: bool,
 ) -> Result<()> {
     if is_steam_running() {
         warn!("Steam appears to be running; it may overwrite localconfig.vdf changes on exit");
@@ -37,7 +38,7 @@ pub fn apply_steam_launch_options(
             matched_any = true;
         }
 
-        let (updated, changed) = update_localconfig_content(&original, app_id, choice, managed_env);
+        let (updated, changed) = update_localconfig_content(&original, app_id, choice, managed_env, use_env_wrapper);
         let current_content = if changed {
             write_backup_if_missing(&path, &original)?;
             fs::write(&path, &updated)
@@ -151,6 +152,7 @@ fn update_localconfig_content(
     app_id: &str,
     choice: &GpuChoice,
     managed_env: &[String],
+    use_env_wrapper: bool,
 ) -> (String, bool) {
     let apps_block = find_steam_apps_block(content).or_else(|| {
         warn!("Steam apps block not found at canonical path; trying fallback global apps search");
@@ -162,7 +164,7 @@ fn update_localconfig_content(
         return (content.to_string(), false);
     };
 
-    let desired_prefix = build_managed_prefix(choice, managed_env);
+    let desired_prefix = build_managed_prefix(choice, managed_env, use_env_wrapper);
     let (mut out, changed) = upsert_app_launch_options(
         content,
         apps_key,
@@ -302,7 +304,7 @@ fn apply_prefix_to_existing(existing: Option<&str>, desired_prefix: Option<&str>
     }
 }
 
-fn build_managed_prefix(choice: &GpuChoice, managed_env: &[String]) -> Option<String> {
+fn build_managed_prefix(choice: &GpuChoice, managed_env: &[String], use_env_wrapper: bool) -> Option<String> {
     let GpuChoice::Gpu(idx) = choice else {
         return None;
     };
@@ -312,8 +314,10 @@ fn build_managed_prefix(choice: &GpuChoice, managed_env: &[String]) -> Option<St
         managed_env.to_vec()
     };
 
+    let prefix = if use_env_wrapper { "env " } else { "" };
     Some(format!(
-        "{} {} {}",
+        "{}{} {} {}",
+        prefix,
         KAEDE_STEAM_START,
         vars.join(" "),
         KAEDE_STEAM_END

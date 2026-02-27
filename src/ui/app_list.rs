@@ -156,7 +156,13 @@ pub(crate) fn rebuild_app_list(
                     );
                 }
 
-                match apply_launcher_override(&app, &choice, selected_gpu.as_ref(), gpus_shared.as_ref()) {
+                match apply_launcher_override(
+                    &app,
+                    &choice,
+                    selected_gpu.as_ref(),
+                    gpus_shared.as_ref(),
+                    config.borrow().use_env_wrapper(),
+                ) {
                     Ok(()) => info!(
                         app_name = %app.name,
                         desktop_id = %app.desktop_id,

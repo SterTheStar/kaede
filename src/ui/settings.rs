@@ -42,11 +42,17 @@ pub(crate) fn show_settings_dialog(
     switcher.set_hexpand(true);
 
     // Application-wide settings (General tab)
+    let general_scrolled = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .build();
+
     let general_page = gtk::Box::new(gtk::Orientation::Vertical, 12);
     general_page.set_margin_top(12);
     general_page.set_margin_bottom(12);
     general_page.set_margin_start(18);
     general_page.set_margin_end(18);
+    general_scrolled.set_child(Some(&general_page));
 
     let general_desc = gtk::Label::new(Some(
         "Configure how Kaede discovers and displays applications.",
@@ -91,14 +97,30 @@ pub(crate) fn show_settings_dialog(
     show_flatpak_row.set_activatable_widget(Some(&show_flatpak_switch));
     app_list.append(&show_flatpak_row);
 
+    let use_env_switch = gtk::Switch::builder().valign(gtk::Align::Center).build();
+    use_env_switch.set_active(config.borrow().use_env_wrapper());
+    let use_env_row = adw::ActionRow::builder()
+        .title("Use 'env' command wrapper")
+        .subtitle("Prepends 'env' before GPU vars in the launch command. Does not apply to Heroic games.")
+        .build();
+    use_env_row.add_suffix(&use_env_switch);
+    use_env_row.set_activatable_widget(Some(&use_env_switch));
+    app_list.append(&use_env_row);
+
     general_page.append(&app_list);
 
-    // NVIDIA-specific settings (may be disabled when no NVIDIA GPU is present) - Advanced tab
+    // NVIDIA-specific settings (Advanced tab)
+    let nvidia_scrolled = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .build();
+
     let nvidia_page = gtk::Box::new(gtk::Orientation::Vertical, 12);
     nvidia_page.set_margin_top(12);
     nvidia_page.set_margin_bottom(12);
     nvidia_page.set_margin_start(18);
     nvidia_page.set_margin_end(18);
+    nvidia_scrolled.set_child(Some(&nvidia_page));
 
     let nvidia_desc = gtk::Label::new(Some(
         "Advanced options for NVIDIA systems. These settings may require root privileges and a reboot.",
@@ -210,9 +232,9 @@ pub(crate) fn show_settings_dialog(
     nvidia_page.append(&list);
     nvidia_page.append(&nvidia_help);
 
-    let gen_page = stack.add_titled(&general_page, Some("general"), "General");
+    let gen_page = stack.add_titled(&general_scrolled, Some("general"), "General");
     gen_page.set_icon_name(Some("view-list-symbolic"));
-    let nvid_page = stack.add_titled(&nvidia_page, Some("nvidia"), "NVIDIA & power");
+    let nvid_page = stack.add_titled(&nvidia_scrolled, Some("nvidia"), "NVIDIA & power");
     nvid_page.set_icon_name(Some("emblem-system-symbolic"));
 
     let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -421,6 +443,7 @@ pub(crate) fn show_settings_dialog(
                 cfg.set_show_steam_apps(show_steam_switch.is_active());
                 cfg.set_show_heroic_apps(show_heroic_switch.is_active());
                 cfg.set_show_flatpak_apps(show_flatpak_switch.is_active());
+                cfg.set_use_env_wrapper(use_env_switch.is_active());
                 if let Err(err) = cfg.save() {
                     error!(%err, "failed to save app settings");
                 }
