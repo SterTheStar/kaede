@@ -28,6 +28,9 @@ pub(crate) fn set_details_panel_visible(
     } else {
         apps_scrolled.set_margin_end(0);
     }
+    if visible {
+        details_revealer.set_visible(true);
+    }
     details_revealer.set_reveal_child(visible);
 }
 

@@ -5,6 +5,7 @@ mod heroic;
 mod launcher;
 mod logger;
 mod models;
+mod nvidia;
 mod steam;
 mod ui;
 

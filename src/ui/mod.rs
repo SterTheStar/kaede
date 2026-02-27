@@ -19,11 +19,13 @@ const APP_ICON_PATH: &str = "com.kaede.gpu-manager";
 mod about;
 mod app_list;
 mod details;
+mod settings;
 mod util;
 
 use self::about::show_about_dialog;
 use self::app_list::rebuild_app_list;
 use self::details::{set_app_details, set_app_details_empty, AppDetailsWidgets};
+use self::settings::show_settings_dialog;
 use self::util::{set_details_panel_visible, widget_is_descendant_of};
 
 #[derive(Clone)]
@@ -59,10 +61,15 @@ pub fn build_ui(app: &adw::Application) {
         .icon_name("view-refresh-symbolic")
         .tooltip_text("Refresh GPU and app scan")
         .build();
+    let settings_btn = gtk::Button::builder()
+        .icon_name("emblem-system-symbolic")
+        .tooltip_text("NVIDIA graphics mode")
+        .build();
     let about_btn = gtk::Button::builder()
         .icon_name("dialog-information-symbolic")
         .tooltip_text("About Kaede")
         .build();
+    header.pack_end(&settings_btn);
     header.pack_end(&about_btn);
     header.pack_end(&refresh_btn);
 
@@ -245,8 +252,14 @@ pub fn build_ui(app: &adw::Application) {
 
     let details_revealer = gtk::Revealer::builder()
         .reveal_child(false)
+        .visible(false)
         .transition_type(gtk::RevealerTransitionType::SlideLeft)
         .build();
+    details_revealer.connect_child_revealed_notify(|revealer| {
+        if !revealer.reveals_child() && !revealer.is_child_revealed() {
+            revealer.set_visible(false);
+        }
+    });
     details_revealer.set_child(Some(&details_scrolled));
     content.set_end_child(Some(&details_revealer));
     content.set_resize_end_child(false);
@@ -413,6 +426,10 @@ pub fn build_ui(app: &adw::Application) {
         let apps_box = apps_box.clone();
         let header_widget = header.clone().upcast::<gtk::Widget>();
         let search = search.clone();
+        let search_btn_widget = search_btn.clone().upcast::<gtk::Widget>();
+        let refresh_btn_widget = refresh_btn.clone().upcast::<gtk::Widget>();
+        let settings_btn_widget = settings_btn.clone().upcast::<gtk::Widget>();
+        let about_btn_widget = about_btn.clone().upcast::<gtk::Widget>();
         let search_btn = search_btn.clone();
         let search_overlay = search_overlay.clone();
         let search_widget = search.clone().upcast::<gtk::Widget>();
@@ -425,7 +442,7 @@ pub fn build_ui(app: &adw::Application) {
         let selected_app_id = selected_app_id.clone();
         let state = state.clone();
         let click = gtk::GestureClick::new();
-        click.connect_pressed(move |gesture, _, x, y| {
+        click.connect_released(move |gesture, _n_press, x, y| {
             let Some(widget) = gesture.widget() else {
                 return;
             };
@@ -433,23 +450,32 @@ pub fn build_ui(app: &adw::Application) {
                 return;
             };
 
-            if widget_is_descendant_of(&picked, &header_widget) {
-                return;
-            }
+            let in_header = widget_is_descendant_of(&picked, &header_widget);
+            let in_search_btn = widget_is_descendant_of(&picked, &search_btn_widget);
+            let in_search_entry = widget_is_descendant_of(&picked, &search_widget);
+            let in_refresh = widget_is_descendant_of(&picked, &refresh_btn_widget);
+            let in_settings = widget_is_descendant_of(&picked, &settings_btn_widget);
+            let in_about = widget_is_descendant_of(&picked, &about_btn_widget);
 
-            let in_search = widget_is_descendant_of(&picked, &search_widget);
-            if search_overlay.is_visible() && !in_search {
+            let is_action_widget =
+                in_search_btn || in_search_entry || in_refresh || in_settings || in_about;
+
+            if search_overlay.is_visible() && !in_search_entry {
                 if search.text().is_empty() {
                     search_overlay.set_visible(false);
                     search_btn.set_visible(true);
-                } else {
+                } else if !is_action_widget {
                     gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
                 }
             }
 
+            if is_action_widget {
+                return;
+            }
+
             let in_apps = widget_is_descendant_of(&picked, &apps_box_widget);
             let in_details = widget_is_descendant_of(&picked, &details_revealer_widget);
-            if !in_apps && !in_details {
+            if in_header || (!in_apps && !in_details) {
                 apps_box.unselect_all();
                 *selected_app_id.borrow_mut() = None;
                 let gpus = state.borrow().gpus.clone();
@@ -464,6 +490,16 @@ pub fn build_ui(app: &adw::Application) {
         let window = window.clone();
         about_btn.connect_clicked(move |_| {
             show_about_dialog(&window);
+        });
+    }
+
+    {
+        let window = window.clone();
+        let state = state.clone();
+        let config = config.clone();
+        settings_btn.connect_clicked(move |_| {
+            let gpus = state.borrow().gpus.clone();
+            show_settings_dialog(&window, &gpus, &config);
         });
     }
 

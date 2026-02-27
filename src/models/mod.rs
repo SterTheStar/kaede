@@ -51,8 +51,29 @@ impl GpuChoice {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub assignments: BTreeMap<String, GpuChoice>,
+    #[serde(default = "default_true")]
+    pub show_steam_apps: bool,
+    #[serde(default = "default_true")]
+    pub show_heroic_apps: bool,
+    #[serde(default = "default_true")]
+    pub show_flatpak_apps: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            assignments: BTreeMap::new(),
+            show_steam_apps: true,
+            show_heroic_apps: true,
+            show_flatpak_apps: true,
+        }
+    }
 }

@@ -44,6 +44,30 @@ impl ConfigStore {
             .with_context(|| format!("failed to write config at {}", self.path.display()))?;
         Ok(())
     }
+
+    pub fn show_steam_apps(&self) -> bool {
+        self.data.show_steam_apps
+    }
+
+    pub fn set_show_steam_apps(&mut self, value: bool) {
+        self.data.show_steam_apps = value;
+    }
+
+    pub fn show_heroic_apps(&self) -> bool {
+        self.data.show_heroic_apps
+    }
+
+    pub fn set_show_heroic_apps(&mut self, value: bool) {
+        self.data.show_heroic_apps = value;
+    }
+
+    pub fn show_flatpak_apps(&self) -> bool {
+        self.data.show_flatpak_apps
+    }
+
+    pub fn set_show_flatpak_apps(&mut self, value: bool) {
+        self.data.show_flatpak_apps = value;
+    }
 }
 
 fn config_path() -> PathBuf {

@@ -29,8 +29,21 @@ pub(crate) fn rebuild_app_list(
     visible_apps.borrow_mut().clear();
     let gpus_shared = Rc::new(gpus.to_vec());
     let normalized = filter.to_lowercase();
+    let cfg = config.borrow();
+    let show_steam = cfg.show_steam_apps();
+    let show_heroic = cfg.show_heroic_apps();
+    let show_flatpak = cfg.show_flatpak_apps();
 
     for app in apps {
+        if app.is_steam_game && !show_steam {
+            continue;
+        }
+        if app.is_heroic_game && !show_heroic {
+            continue;
+        }
+        if app.is_flatpak && !show_flatpak {
+            continue;
+        }
         if !normalized.is_empty() && !app.name.to_lowercase().contains(&normalized) {
             continue;
         }
