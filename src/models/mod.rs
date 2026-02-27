@@ -96,6 +96,8 @@ pub struct AppConfig {
     pub show_flatpak_apps: bool,
     #[serde(default)]
     pub use_env_wrapper: bool,
+    #[serde(default)]
+    pub skip_nvidia_warning: bool,
 }
 
 fn default_true() -> bool {
@@ -110,6 +112,7 @@ impl Default for AppConfig {
             show_heroic_apps: true,
             show_flatpak_apps: true,
             use_env_wrapper: false,
+            skip_nvidia_warning: false,
         }
     }
 }

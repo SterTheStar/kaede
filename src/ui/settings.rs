@@ -25,6 +25,7 @@ pub(crate) fn build_settings_widget(
 ) -> (gtk::Box, adw::ViewSwitcher) {
     let has_nvidia = has_nvidia_gpu(gpus);
     let current_mode = get_current_mode();
+    let skip_warning = config.borrow().skip_nvidia_warning();
 
     let stack = adw::ViewStack::new();
     stack.set_vexpand(true);
@@ -95,7 +96,60 @@ pub(crate) fn build_settings_widget(
     use_env_row.set_activatable_widget(Some(&use_env_switch));
     app_list.append(&use_env_row);
 
+    let reset_cfg_btn = gtk::Button::builder()
+        .label("Clear all app data")
+        .valign(gtk::Align::Center)
+        .build();
+    reset_cfg_btn.add_css_class("destructive-action");
+    let reset_cfg_row = adw::ActionRow::builder()
+        .title("Reset configuration")
+        .subtitle("Permanently delete all assignments and settings")
+        .build();
+    reset_cfg_row.add_suffix(&reset_cfg_btn);
+
     general_page.append(&app_list);
+
+    let reset_cfg_list = gtk::ListBox::new();
+    reset_cfg_list.add_css_class("boxed-list");
+    reset_cfg_list.set_selection_mode(gtk::SelectionMode::None);
+    reset_cfg_list.append(&reset_cfg_row);
+
+    let reset_desc = gtk::Label::new(Some("Maintenance and recovery options. Use with caution."));
+    reset_desc.add_css_class("dim-label");
+    reset_desc.set_xalign(0.0);
+    reset_desc.set_margin_top(12);
+
+    general_page.append(&reset_desc);
+    general_page.append(&reset_cfg_list);
+
+    {
+        let config = config.clone();
+        let window = window.clone();
+        reset_cfg_btn.connect_clicked(move |_| {
+            let dlg = gtk::MessageDialog::builder()
+                .transient_for(&window)
+                .modal(true)
+                .message_type(gtk::MessageType::Question)
+                .text("Clear all app data?")
+                .secondary_text("This will reset all your GPU assignments and settings to defaults. The application will close to apply changes.")
+                .build();
+            dlg.add_button("Cancel", gtk::ResponseType::Cancel);
+            dlg.add_button("Reset", gtk::ResponseType::Accept);
+            dlg.set_default_response(gtk::ResponseType::Accept);
+            
+            let config = config.clone();
+            dlg.connect_response(move |d, res| {
+                if res == gtk::ResponseType::Accept {
+                    if let Err(e) = config.borrow_mut().reset() {
+                        error!("failed to reset config: {}", e);
+                    }
+                    std::process::exit(0);
+                }
+                d.close();
+            });
+            dlg.present();
+        });
+    }
 
     // NVIDIA-specific settings (Advanced tab)
     let nvidia_scrolled = gtk::ScrolledWindow::builder()
@@ -109,6 +163,67 @@ pub(crate) fn build_settings_widget(
     nvidia_page.set_margin_start(18);
     nvidia_page.set_margin_end(18);
     nvidia_scrolled.set_child(Some(&nvidia_page));
+
+    let nvidia_main_stack = gtk::Stack::new();
+    nvidia_main_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+
+    let warning_box = gtk::Box::new(gtk::Orientation::Vertical, 20);
+    warning_box.set_valign(gtk::Align::Center);
+    warning_box.set_halign(gtk::Align::Center);
+    warning_box.set_margin_start(40);
+    warning_box.set_margin_end(40);
+
+    let warning_icon = gtk::Image::builder()
+        .icon_name("dialog-warning-symbolic")
+        .pixel_size(64)
+        .build();
+    warning_icon.add_css_class("warning");
+    
+    let warning_title = gtk::Label::new(None);
+    warning_title.set_markup("<span size='large' weight='bold'>Advanced NVIDIA Settings</span>");
+    
+    let optimus_explanation = gtk::Label::new(Some(
+        "NVIDIA Optimus is a hybrid computing technology designed to save power and maximize performance on laptops. It combines an integrated GPU (low power) with a dedicated NVIDIA GPU (high performance).\n\nThe system automatically switches between them: the integrated GPU handles simple tasks, while the NVIDIA GPU is activated for games or heavy applications. This ensures longer battery life without sacrificing power."
+    ));
+    optimus_explanation.set_wrap(true);
+    optimus_explanation.set_max_width_chars(60);
+    optimus_explanation.set_justify(gtk::Justification::Center);
+    optimus_explanation.add_css_class("dim-label");
+
+    let agree_btn = gtk::Button::with_label("I understand the risks and wish to proceed");
+    agree_btn.add_css_class("suggested-action");
+    agree_btn.set_halign(gtk::Align::Center);
+
+    let skip_warning_check = gtk::CheckButton::with_label("Don't show this again");
+    skip_warning_check.set_halign(gtk::Align::Center);
+
+    warning_box.append(&warning_icon);
+    warning_box.append(&warning_title);
+    warning_box.append(&optimus_explanation);
+    warning_box.append(&agree_btn);
+    warning_box.append(&skip_warning_check);
+
+    nvidia_main_stack.add_named(&warning_box, Some("warning"));
+    nvidia_main_stack.add_named(&nvidia_scrolled, Some("settings"));
+
+    if skip_warning {
+        nvidia_main_stack.set_visible_child_name("settings");
+    }
+    
+    {
+        let stack = nvidia_main_stack.clone();
+        let scroll = nvidia_scrolled.clone();
+        let config = config.clone();
+        let skip_warning_check = skip_warning_check.clone();
+        agree_btn.connect_clicked(move |_| {
+            if skip_warning_check.is_active() {
+                let mut cfg = config.borrow_mut();
+                cfg.set_skip_nvidia_warning(true);
+                let _ = cfg.save();
+            }
+            stack.set_visible_child_name("settings");
+        });
+    }
 
     let nvidia_desc = gtk::Label::new(Some(
         "Advanced options for NVIDIA systems. These settings may require root privileges and a reboot.",
@@ -209,6 +324,17 @@ pub(crate) fn build_settings_widget(
     dm_row.set_activatable_widget(Some(&dm_dropdown));
     list.append(&dm_row);
 
+    let reset_btn = gtk::Button::with_label("Full reset");
+    reset_btn.add_css_class("destructive-action");
+    reset_btn.set_visible(false);
+    let reset_sddm_btn = gtk::Button::with_label("Reset SDDM Xsetup");
+    reset_sddm_btn.set_visible(false);
+
+    if !has_nvidia {
+        reset_btn.set_sensitive(false);
+        reset_sddm_btn.set_sensitive(false);
+    }
+
     let nvidia_help = gtk::Label::new(Some(
         "NVIDIA settings apply system-wide and require a reboot; use only if you understand how hybrid graphics work on your system.",
     ));
@@ -222,7 +348,7 @@ pub(crate) fn build_settings_widget(
 
     let gen_page = stack.add_titled(&general_scrolled, Some("general"), "General");
     gen_page.set_icon_name(Some("view-list-symbolic"));
-    let nvid_page = stack.add_titled(&nvidia_scrolled, Some("nvidia"), "NVIDIA & power");
+    let nvid_page = stack.add_titled(&nvidia_main_stack, Some("nvidia"), "NVIDIA & power");
     nvid_page.set_icon_name(Some("emblem-system-symbolic"));
 
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -252,9 +378,6 @@ pub(crate) fn build_settings_widget(
     button_box.set_margin_start(18);
     button_box.set_margin_end(18);
 
-    let reset_btn = gtk::Button::with_label("Full reset");
-    reset_btn.add_css_class("destructive-action");
-    let reset_sddm_btn = gtk::Button::with_label("Reset SDDM Xsetup");
     let apply_btn = gtk::Button::with_label("Applied");
     apply_btn.add_css_class("suggested-action");
     apply_btn.set_sensitive(false);
@@ -269,9 +392,43 @@ pub(crate) fn build_settings_widget(
     button_box.append(&apply_btn);
     root.append(&button_box);
 
-    if !has_nvidia {
-        reset_btn.set_sensitive(false);
-        reset_sddm_btn.set_sensitive(false);
+    // Dynamic visibility for NVIDIA reset buttons in the footer
+    {
+        let stack = stack.clone();
+        let n_stack = nvidia_main_stack.clone();
+        let r_btn = reset_btn.clone();
+        let rs_btn = reset_sddm_btn.clone();
+        let a_btn = apply_btn.clone();
+        
+        let update_visibility = move |st: &adw::ViewStack, nst: &gtk::Stack, b1: &gtk::Button, b2: &gtk::Button, b3: &gtk::Button| {
+            let is_nvidia_tab = st.visible_child_name().as_deref() == Some("nvidia");
+            let is_agreed = nst.visible_child_name().as_deref() == Some("settings");
+            
+            b1.set_visible(is_nvidia_tab && is_agreed);
+            b2.set_visible(is_nvidia_tab && is_agreed);
+            b3.set_visible(!is_nvidia_tab || is_agreed);
+        };
+
+        // Initial check
+        update_visibility(&stack, &nvidia_main_stack, &reset_btn, &reset_sddm_btn, &apply_btn);
+
+        // On tab change
+        let n_stack_c = n_stack.clone();
+        let r_btn_c = r_btn.clone();
+        let rs_btn_c = rs_btn.clone();
+        let a_btn_c = a_btn.clone();
+        stack.connect_visible_child_notify(move |st| {
+            update_visibility(st, &n_stack_c, &r_btn_c, &rs_btn_c, &a_btn_c);
+        });
+
+        // On agreement (warning dismissed)
+        let stack_c = stack.clone();
+        let r_btn_c2 = r_btn.clone();
+        let rs_btn_c2 = rs_btn.clone();
+        let a_btn_c2 = a_btn.clone();
+        n_stack.connect_visible_child_name_notify(move |nst| {
+            update_visibility(&stack_c, nst, &r_btn_c2, &rs_btn_c2, &a_btn_c2);
+        });
     }
 
     // Reativa o Apply sempre que qualquer configuração for alterada
