@@ -24,41 +24,59 @@
 
 ## Core Features
 
-- **Hardware Discovery**: Automatically detects available GPUs via `/sys/class/drm`, `lspci`, and `/dev/dri/renderD*`.
-- **Renderer Analysis**: Evaluates active renderers using `glxinfo -B` with Vulkan fallback support.
-- **Application Scanning**: Indexes `.desktop` files across system and user-wide paths:
-  - `/usr/share/applications`
-  - `/usr/local/share/applications`
-  - `~/.local/share/applications`
-  - `/var/lib/flatpak/exports/share/applications`
-  - `~/.local/share/flatpak/exports/share/applications`
-- **User-Centric Management**: Searchable interface with per-app GPU preference selection.
-- **Non-Destructive Overrides**: Modifies local user configurations without altering system-level files.
+* Automatic GPU discovery using `/sys/class/drm`, `lspci`, and `/dev/dri/renderD*`.
+* Renderer inspection via `glxinfo -B`, with Vulkan fallback support.
+* Application indexing from standard `.desktop` locations:
 
-## Integration Targets
+```
+/usr/share/applications
+/usr/local/share/applications
+~/.local/share/applications
+/var/lib/flatpak/exports/share/applications
+~/.local/share/flatpak/exports/share/applications
+```
 
-| Ecosystem | Implementation Strategy |
-| :--- | :--- |
-| **Native Binaries** | Generates localized `.desktop` overrides in `~/.local/share/applications`. |
-| **Flatpak Apps** | Executes `flatpak override --user` to inject environment variables. |
-| **Steam (Proton)** | Dynamically updates `LaunchOptions` in `localconfig.vdf`. |
-| **Heroic Launcher** | Modifies JSON configuration files within `GamesConfig` for environment control. |
+* Searchable interface with per-application GPU selection.
+* User-level overrides that never modify system files.
 
-## GPU Driver Orchestration
+## Integration
 
-Kaede manages the following environment variables to ensure optimal hardware utilization:
+Kaede integrates with several Linux application ecosystems:
 
-- `DRI_PRIME` for Mesa/Open Source drivers.
-- `PRESSURE_VESSEL_IMPORT_VARS` for Steam Runtime compatibility.
-- **NVIDIA Prime Offload**:
-  - `__NV_PRIME_RENDER_OFFLOAD=1`
-  - `__GLX_VENDOR_LIBRARY_NAME=nvidia`
-  - `__VK_LAYER_NV_optimus=NVIDIA_only`
-- **Mesa Vulkan Layer**:
-  - `MESA_VK_DEVICE_SELECT`
-  - `MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE`
+| Target              | Method                                                         |
+| ------------------- | -------------------------------------------------------------- |
+| Native applications | Creates `.desktop` overrides in `~/.local/share/applications`  |
+| Flatpak             | Uses `flatpak override --user` to inject environment variables |
+| Steam (Proton)      | Updates `LaunchOptions` in `localconfig.vdf`                   |
+| Heroic Launcher     | Edits environment configuration inside `GamesConfig`           |
 
-### Build from Source
+## GPU Environment Handling
+
+Kaede configures environment variables used by common Linux GPU stacks.
+
+**Mesa / Open drivers**
+
+```
+DRI_PRIME
+MESA_VK_DEVICE_SELECT
+MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE
+```
+
+**Steam runtime**
+
+```
+PRESSURE_VESSEL_IMPORT_VARS
+```
+
+**NVIDIA Prime Render Offload**
+
+```
+__NV_PRIME_RENDER_OFFLOAD=1
+__GLX_VENDOR_LIBRARY_NAME=nvidia
+__VK_LAYER_NV_optimus=NVIDIA_only
+```
+
+## Build from Source
 
 ```bash
 git clone https://github.com/SterTheStar/kaede.git
@@ -69,12 +87,22 @@ cargo build --release
 
 ## Configuration
 
-Persistent settings are stored in TOML format:
-`~/.config/kaede/config.toml`
+Configuration is stored in:
+
+```
+~/.config/kaede/config.toml
+```
 
 ## License
 
-Distributed under the **GNU General Public License v3.0**. See `LICENSE` for more information.
+Released under the GNU General Public License v3.0.
+See `LICENSE` for details.
+
+---
+
+<p align="center">
+  Developed by <a href="https://github.com/SterTheStar">Esther</a>
+</p>
 
 ---
 <p align="center">
