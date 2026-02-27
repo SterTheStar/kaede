@@ -300,9 +300,10 @@ pub(crate) fn show_settings_dialog(
     let reset_btn = gtk::Button::with_label("Full reset");
     reset_btn.add_css_class("destructive-action");
     let reset_sddm_btn = gtk::Button::with_label("Reset SDDM Xsetup");
-    let cancel_btn = gtk::Button::with_label("Cancel");
-    let apply_btn = gtk::Button::with_label("Apply");
+    let apply_btn = gtk::Button::with_label("Applied");
     apply_btn.add_css_class("suggested-action");
+    apply_btn.set_sensitive(false);
+    apply_btn.set_size_request(90, 34);
 
     let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     spacer.set_hexpand(true);
@@ -310,7 +311,6 @@ pub(crate) fn show_settings_dialog(
     button_box.append(&reset_btn);
     button_box.append(&reset_sddm_btn);
     button_box.append(&spacer);
-    button_box.append(&cancel_btn);
     button_box.append(&apply_btn);
     root.append(&button_box);
 
@@ -321,10 +321,31 @@ pub(crate) fn show_settings_dialog(
         reset_sddm_btn.set_sensitive(false);
     }
 
+    // Reativa o Apply sempre que qualquer configuração for alterada
+    macro_rules! on_change {
+        ($widget:expr, $method:ident) => {{
+            let btn = apply_btn.clone();
+            $widget.$method(move |_| {
+                btn.set_label("Apply");
+                btn.set_sensitive(true);
+            });
+        }};
+    }
+    on_change!(show_steam_switch, connect_active_notify);
+    on_change!(show_heroic_switch, connect_active_notify);
+    on_change!(show_flatpak_switch, connect_active_notify);
+    on_change!(use_env_switch, connect_active_notify);
+    on_change!(mode_dropdown, connect_selected_notify);
+    on_change!(force_switch, connect_active_notify);
+    on_change!(coolbits_switch, connect_active_notify);
+    on_change!(rtd3_dropdown, connect_selected_notify);
+    on_change!(nvidia_current_switch, connect_active_notify);
+    on_change!(dm_dropdown, connect_selected_notify);
     {
-        let window = window.clone();
-        cancel_btn.connect_clicked(move |_| {
-            window.close();
+        let btn = apply_btn.clone();
+        coolbits_entry.connect_value_changed(move |_| {
+            btn.set_label("Apply");
+            btn.set_sensitive(true);
         });
     }
 
@@ -399,10 +420,9 @@ pub(crate) fn show_settings_dialog(
     }
 
     {
-        let parent = parent.clone();
         let window = window.clone();
         let config = config.clone();
-        apply_btn.connect_clicked(move |_| {
+        apply_btn.connect_clicked(move |btn| {
             let selected = mode_dropdown.selected();
             let mode = match selected {
                 0 => GraphicsMode::Integrated,
@@ -436,8 +456,6 @@ pub(crate) fn show_settings_dialog(
                 _ => None,
             };
 
-            window.close();
-
             {
                 let mut cfg = config.borrow_mut();
                 cfg.set_show_steam_apps(show_steam_switch.is_active());
@@ -449,21 +467,14 @@ pub(crate) fn show_settings_dialog(
                 }
             }
 
+            btn.set_label("Applied");
+            btn.set_sensitive(false);
+
             if !has_nvidia {
-                let dlg = gtk::MessageDialog::builder()
-                    .transient_for(&parent)
-                    .modal(true)
-                    .message_type(gtk::MessageType::Info)
-                    .text("Settings updated")
-                    .secondary_text("Application settings were updated successfully.")
-                    .build();
-                dlg.add_button("OK", gtk::ResponseType::Ok);
-                dlg.connect_response(|d, _| d.close());
-                dlg.present();
                 return;
             }
 
-            let config = NvidiaSwitchConfig {
+            let nvidia_config = NvidiaSwitchConfig {
                 mode,
                 display_manager,
                 enable_force_comp,
@@ -472,32 +483,18 @@ pub(crate) fn show_settings_dialog(
                 use_nvidia_current,
             };
 
-            match switch_graphics_mode(&config) {
-                Ok(()) => {
-                    let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
-                        .modal(true)
-                        .message_type(gtk::MessageType::Info)
-                        .text("GPU mode switch requested")
-                        .secondary_text("Configuration files were updated successfully.\nYou should reboot the system for changes to take effect.")
-                        .build();
-                    dlg.add_button("OK", gtk::ResponseType::Ok);
-                    dlg.connect_response(|d, _| d.close());
-                    dlg.present();
-                }
-                Err(err) => {
-                    error!(%err, "failed to switch NVIDIA graphics mode");
-                    let dlg = gtk::MessageDialog::builder()
-                        .transient_for(&parent)
-                        .modal(true)
-                        .message_type(gtk::MessageType::Error)
-                        .text("Failed to switch NVIDIA graphics mode")
-                        .secondary_text(&err)
-                        .build();
-                    dlg.add_button("Close", gtk::ResponseType::Close);
-                    dlg.connect_response(|d, _| d.close());
-                    dlg.present();
-                }
+            if let Err(err) = switch_graphics_mode(&nvidia_config) {
+                error!(%err, "failed to switch NVIDIA graphics mode");
+                let dlg = gtk::MessageDialog::builder()
+                    .transient_for(&window)
+                    .modal(true)
+                    .message_type(gtk::MessageType::Error)
+                    .text("Failed to switch NVIDIA graphics mode")
+                    .secondary_text(&err)
+                    .build();
+                dlg.add_button("Close", gtk::ResponseType::Close);
+                dlg.connect_response(|d, _| d.close());
+                dlg.present();
             }
         });
     }
